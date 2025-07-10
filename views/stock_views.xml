@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Extend Stock Quant Tree - Add marketplace sync status -->
+        <record id="view_stock_quant_tree_marketplace" model="ir.ui.view">
+            <field name="name">stock.quant.tree.marketplace</field>
+            <field name="model">stock.quant</field>
+            <field name="inherit_id" ref="stock.view_stock_quant_tree" />
+            <field name="arch" type="xml">
+                <field name="quantity" position="after">
+                    <field name="marketplace_stock_sync_status" optional="hide" />
+                    <field name="last_marketplace_sync" optional="hide" />
+                    <field name="stock_sync_error" optional="hide" />
+                </field>
+            </field>
+        </record>
+
+        <!-- Extend Stock Location Form - Add marketplace settings -->
+        <record id="view_location_form_marketplace" model="ir.ui.view">
+            <field name="name">stock.location.form.marketplace</field>
+            <field name="model">stock.location</field>
+            <field name="inherit_id" ref="stock.view_location_form" />
+            <field name="arch" type="xml">
+                <xpath expr="//group[@name='additional_info']" position="after">
+                    <group name="marketplace_settings" string="Cartona Marketplace Settings" invisible="usage != 'internal'">
+                        <field name="marketplace_sync_enabled" />
+                        <field name="marketplace_location_code" invisible="marketplace_sync_enabled == False" />
+                    </group>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Extend Stock Location Tree - Add marketplace columns -->
+        <record id="view_location_tree_marketplace" model="ir.ui.view">
+            <field name="name">stock.location.tree.marketplace</field>
+            <field name="model">stock.location</field>
+            <field name="inherit_id" ref="stock.view_location_tree2" />
+            <field name="arch" type="xml">
+                <field name="usage" position="after">
+                    <field name="marketplace_sync_enabled" optional="hide" />
+                    <field name="marketplace_location_code" optional="hide" />
+                </field>
+            </field>
+        </record>
+
+        <!-- Create stock search view with marketplace filters -->
+        <record id="view_stock_quant_filter_marketplace" model="ir.ui.view">
+            <field name="name">stock.quant.search.marketplace</field>
+            <field name="model">stock.quant</field>
+            <field name="inherit_id" ref="stock.quant_search_view" />
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='location_id']" position="after">
+                    <filter string="Sync Pending" name="sync_pending"
+                        domain="[('marketplace_stock_sync_status', '=', 'pending')]" />
+                    <filter string="Sync Errors" name="sync_errors"
+                        domain="[('marketplace_stock_sync_status', '=', 'error')]" />
+                </xpath>
+
+                <xpath expr="//group" position="inside">
+                    <filter string="Sync Status" name="group_sync_status"
+                        context="{'group_by': 'marketplace_stock_sync_status'}" />
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

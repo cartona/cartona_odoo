@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Cron Job: Pull Orders from Marketplaces -->
+        <record id="cron_pull_marketplace_orders" model="ir.cron">
+            <field name="name">Pull Marketplace Orders</field>
+            <field name="model_id" ref="model_marketplace_api"/>
+            <field name="state">code</field>
+            <field name="code">
+# Pull orders from all active marketplaces
+marketplaces = env['marketplace.config'].search([
+    ('active', '=', True),
+    ('auto_pull_orders', '=', True)
+])
+
+for marketplace in marketplaces:
+    try:
+        api_client = env['marketplace.api'].with_context(
+            marketplace_config_id=marketplace.id
+        )
+        api_client.pull_and_process_orders()
+    except Exception as e:
+        env['marketplace.sync.log'].log_operation(
+            marketplace_config_id=marketplace.id,
+            operation_type='order_pull',
+            status='error',
+            message=f"Cron job error: {str(e)}"
+        )
+            </field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+
+        <!-- Cron Job: Sync Product Prices and Stock -->
+        <record id="cron_sync_product_data" model="ir.cron">
+            <field name="name">Sync Product Data to Marketplaces</field>
+            <field name="model_id" ref="model_marketplace_api"/>
+            <field name="state">code</field>
+            <field name="code">
+# Sync products that need updating
+products_to_sync = env['product.template'].search([
+    ('marketplace_sync_enabled', '=', True),
+    ('marketplace_sync_status', 'in', ['not_synced', 'error']),
+    ('active', '=', True)
+], limit=100)  # Process in batches
+
+if products_to_sync:
+    marketplaces = env['marketplace.config'].search([
+        ('active', '=', True),
+        ('auto_sync_products', '=', True)
+    ])
+    
+    for marketplace in marketplaces:
+        try:
+            api_client = env['marketplace.api'].with_context(
+                marketplace_config_id=marketplace.id
+            )
+            api_client.bulk_update_products(products_to_sync)
+        except Exception as e:
+            env['marketplace.sync.log'].log_operation(
+                marketplace_config_id=marketplace.id,
+                operation_type='product_sync',
+                status='error',
+                message=f"Cron job error: {str(e)}"
+            )
+            </field>
+            <field name="interval_number">30</field>
+            <field name="interval_type">minutes</field>
+            <field name="active">True</field>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+
+        <!-- Cron Job: Clean up old logs -->
+        <record id="cron_cleanup_sync_logs" model="ir.cron">
+            <field name="name">Clean up Marketplace Sync Logs</field>
+            <field name="model_id" ref="model_marketplace_sync_log"/>
+            <field name="state">code</field>
+            <field name="code">
+# Clean up logs older than 30 days
+model.cleanup_old_logs(days=30)
+            </field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+
+    </data>
+</odoo>

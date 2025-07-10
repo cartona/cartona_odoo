@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Main Menu -->
+        <menuitem id="menu_marketplace_root" 
+                  name="Cartona" 
+                  sequence="100" 
+                  web_icon="cartona_integration,static/description/icon.png"/>
+
+        <!-- Configuration Menu - Direct link to single config -->
+        <menuitem id="menu_marketplace_config" 
+                  name="Configuration" 
+                  parent="menu_marketplace_root" 
+                  action="action_open_cartona_config" 
+                  sequence="20"/>
+
+        <!-- Monitoring Menu - Direct link to sync logs -->
+        <menuitem id="menu_marketplace_monitoring" 
+                  name="Monitoring" 
+                  parent="menu_marketplace_root" 
+                  action="action_marketplace_sync_log" 
+                  sequence="30"/>
+
+    </data>
+</odoo>

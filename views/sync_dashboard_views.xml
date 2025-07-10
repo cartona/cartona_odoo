@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Sync Dashboard Kanban View -->
+        <record id="view_sync_dashboard_kanban" model="ir.ui.view">
+            <field name="name">marketplace.sync.dashboard</field>
+            <field name="model">marketplace.config</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_dashboard" create="false" edit="false">
+                    <field name="name" />
+                    <field name="active" />
+                    <field name="connection_status" />
+                    <field name="last_sync_date" />
+                    <field name="total_products_synced" />
+                    <field name="total_orders_pulled" />
+                    <field name="auto_sync_stock" />
+                    <field name="auto_pull_orders" />
+                    <field name="error_message" />
+
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click">
+                                <div class="oe_kanban_content">
+                                    <!-- Header -->
+                                    <div class="row">
+                                        <div class="col-8">
+                                            <strong>
+                                                <field name="name" />
+                                            </strong>
+                                        </div>
+                                        <div class="col-4 text-right">
+                                            <span t-if="record.active.raw_value"
+                                                class="badge badge-success">Active</span>
+                                            <span t-if="!record.active.raw_value"
+                                                class="badge badge-secondary">Inactive</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Connection Status -->
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                            <span
+                                                t-if="record.connection_status.raw_value == 'connected'"
+                                                class="badge badge-success">
+                                                <i class="fa fa-check-circle" title="Connected Status" /> Connected </span>
+                                            <span
+                                                t-if="record.connection_status.raw_value == 'error'"
+                                                class="badge badge-danger">
+                                                <i class="fa fa-times-circle" title="Error Status" /> Error </span>
+                                            <span
+                                                t-if="record.connection_status.raw_value == 'not_tested'"
+                                                class="badge badge-warning">
+                                                <i class="fa fa-question-circle" title="Not Tested Status" /> Not Tested </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Statistics -->
+                                    <div class="row mt-3">
+                                        <div class="col-6">
+                                            <div class="text-center">
+                                                <strong class="text-primary">
+                                                    <field name="total_products_synced" />
+                                                </strong>
+                                                <br />
+                                                <small class="text-muted">Products Synced</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-center">
+                                                <strong class="text-success">
+                                                    <field name="total_orders_pulled" />
+                                                </strong>
+                                                <br />
+                                                <small class="text-muted">Orders Pulled</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Auto Sync Status -->
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <small class="text-muted">Auto Sync:</small>
+                                            <span t-if="record.auto_sync_stock.raw_value"
+                                                class="badge badge-pill badge-info">Stock</span>
+                                            <span t-if="record.auto_pull_orders.raw_value"
+                                                class="badge badge-pill badge-info">Orders</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Last Sync -->
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                            <small class="text-muted"> Last Sync: <field
+                                                    name="last_sync_date" />
+                                            </small>
+                                        </div>
+                                    </div>
+
+                                    <!-- Error Message -->
+                                    <div t-if="record.error_message.raw_value" class="row mt-2">
+                                        <div class="col-12">
+                                            <div class="alert alert-danger" role="alert">
+                                                <small>
+                                                    <field name="error_message" />
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <button name="test_connection" type="object"
+                                                class="btn btn-sm btn-primary">
+                                                <i class="fa fa-plug" title="Test Connection" /> Test </button>
+                                            <button name="manual_sync_products" type="object"
+                                                class="btn btn-sm btn-secondary ml-1">
+                                                <i class="fa fa-refresh" title="Sync Products" /> Sync Products </button>
+                                            <button name="manual_pull_orders" type="object"
+                                                class="btn btn-sm btn-secondary ml-1">
+                                                <i class="fa fa-download" title="Pull Orders" /> Pull Orders </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- Sync Log Tree View -->
+        <record id="view_marketplace_sync_log_tree" model="ir.ui.view">
+            <field name="name">marketplace.sync.log.list</field>
+            <field name="model">marketplace.sync.log</field>
+            <field name="arch" type="xml">
+                <list string="Sync Logs" create="false" edit="false">
+                    <field name="create_date"/>
+                    <field name="marketplace_config_id"/>
+                    <field name="operation_type"/>
+                    <field name="status" decoration-success="status == 'success'" decoration-danger="status == 'error'" decoration-warning="status == 'warning'" decoration-info="status == 'info'"/>
+                    <field name="record_name"/>
+                    <field name="message"/>
+                    <field name="duration"/>
+                    <field name="records_processed"/>
+                    <field name="records_success"/>
+                    <field name="records_error"/>
+                    <field name="user_id" widget="badge"/>
+                    <field name="action_type"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Sync Log Form View -->
+        <record id="view_marketplace_sync_log_form" model="ir.ui.view">
+            <field name="name">marketplace.sync.log.form</field>
+            <field name="model">marketplace.sync.log</field>
+            <field name="arch" type="xml">
+                <form string="Sync Log" create="false" edit="false">
+                    <sheet>
+                        <group>
+                            <group name="basic_info" string="Basic Information">
+                                <field name="create_date" />
+                                <field name="marketplace_config_id" />
+                                <field name="operation_type" />
+                                <field name="status" />
+                                <field name="user_id" widget="badge"/>
+                                <field name="action_type"/>
+                            </group>
+                            <group name="record_info" string="Record Information">
+                                <field name="record_model" />
+                                <field name="record_id" />
+                                <field name="record_name" />
+                                <button name="action_view_record" type="object" string="View Record"
+                                    invisible="not record_model or not record_id"
+                                    class="btn-link" />
+                            </group>
+                        </group>
+
+                        <group name="processing_info" string="Processing Information">
+                            <field name="duration" />
+                            <field name="records_processed" />
+                            <field name="records_success" />
+                            <field name="records_error" />
+                        </group>
+
+                        <group name="messages" string="Messages">
+                            <field name="message" nolabel="1" />
+                        </group>
+
+                        <group name="error_details" string="Error Details">
+                            <field name="error_details" nolabel="1" />
+                        </group>
+
+                        <group name="request_data" string="Request Data"
+                            invisible="not request_data">
+                            <field name="request_data" nolabel="1" />
+                        </group>
+
+                        <group name="response_data" string="Response Data"
+                            invisible="not response_data">
+                            <field name="response_data" nolabel="1" />
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Sync Log Search View -->
+        <record id="view_marketplace_sync_log_search" model="ir.ui.view">
+            <field name="name">marketplace.sync.log.search</field>
+            <field name="model">marketplace.sync.log</field>
+            <field name="arch" type="xml">
+                <search string="Sync Logs">
+                    <field name="marketplace_config_id" />
+                    <field name="operation_type" />
+                    <field name="record_name" />
+                    <field name="message" />
+
+                    <filter string="Success" name="success" domain="[('status', '=', 'success')]" />
+                    <filter string="Errors" name="errors" domain="[('status', '=', 'error')]" />
+                    <filter string="Warnings" name="warnings" domain="[('status', '=', 'warning')]" />
+                    <filter string="Info" name="info" domain="[('status', '=', 'info')]" />
+                    <separator />
+                    <filter string="Today" name="today"
+                        domain="[('create_date', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]" />
+                    <filter string="Last 7 Days" name="last_week"
+                        domain="[('create_date', '>=', (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]" />
+
+                    <group expand="0" string="Group By">
+                        <filter string="Cartona Marketplace" name="group_marketplace"
+                            domain="[]" context="{'group_by': 'marketplace_config_id'}" />
+                        <filter string="Operation Type" name="group_operation"
+                            domain="[]" context="{'group_by': 'operation_type'}" />
+                        <filter string="Status" name="group_status"
+                            domain="[]" context="{'group_by': 'status'}" />
+                        <filter string="Date" name="group_date"
+                            domain="[]" context="{'group_by': 'create_date:day'}" />
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Action for Sync Dashboard -->
+        <record id="action_sync_dashboard" model="ir.actions.act_window">
+            <field name="name">Marketplace Sync Dashboard</field>
+            <field name="res_model">marketplace.config</field>
+            <field name="view_mode">kanban</field>
+            <field name="view_id" ref="view_sync_dashboard_kanban" />
+            <field name="domain">[('active', '=', True)]</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Your marketplace sync dashboard
+                </p>
+                <p>
+                    Monitor the status of all your marketplace integrations from here.
+                    Test connections, sync products, and pull orders with one click.
+                </p>
+            </field>
+        </record>
+
+        <!-- Action for Sync Logs -->
+        <record id="action_marketplace_sync_log" model="ir.actions.act_window">
+            <field name="name">Cartona Marketplace Sync Logs</field>
+            <field name="res_model">marketplace.sync.log</field>
+            <field name="view_mode">list,form</field>
+            <field name="view_ids" eval="[(5, 0, 0), (0, 0, {'view_mode': 'list', 'view_id': ref('view_marketplace_sync_log_tree')}), (0, 0, {'view_mode': 'form', 'view_id': ref('view_marketplace_sync_log_form')})]"/>
+            <field name="search_view_id" ref="view_marketplace_sync_log_search" />
+            <field name="context">{'search_default_errors': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No sync logs yet
+                </p>
+                <p>
+                    Sync logs will appear here as you use the Cartona marketplace integration
+                    features.
+                    Use this to monitor sync operations and troubleshoot issues.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

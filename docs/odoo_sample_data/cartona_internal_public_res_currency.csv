@@ -1,0 +1,5 @@
+id,name,symbol,full_name,rounding,decimal_places,active,position,currency_unit_label,currency_subunit_label,create_uid,create_date,write_uid,write_date
+1,EUR,€,Euro,0.00001,5,true,after,Euros,Cents,,,19,2025-06-18 08:38:35.317063
+2,USD,$,United States dollar,0.00001,5,true,before,Dollars,Cents,1,2022-12-18 04:03:32.317182,19,2025-06-15 08:28:23.315054
+74,EGP,EGP,Egyptian pound,0.01,2,true,after,Pound,Piastres,1,2022-12-18 04:03:32.317182,2,2023-02-16 16:15:21.890520
+142,GBP,£,Pound sterling,0.00001,5,true,before,Sterling,Penny,1,2022-12-18 04:03:32.317182,2,2023-02-15 14:12:36.661413

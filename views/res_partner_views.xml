@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Extend Partner Form - Add marketplace fields -->
+        <record id="view_partner_form_marketplace" model="ir.ui.view">
+            <field name="name">res.partner.form.marketplace</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form" />
+            <field name="arch" type="xml">
+                <!-- Add marketplace tab -->
+                <xpath expr="//notebook" position="inside">
+                    <page string="Cartona Marketplace" name="marketplace" invisible="is_marketplace_customer == False">
+                        <group>
+                            <group name="marketplace_info" string="Cartona Marketplace Information">
+                                <field name="cartona_id" placeholder="retailer_12345" />
+                                <field name="marketplace_source" readonly="1" />
+                                <field name="partner_type_marketplace" readonly="1" />
+                                <field name="is_marketplace_customer" readonly="1" />
+                            </group>
+                            <group name="marketplace_sync" string="Sync Status">
+                                <field name="marketplace_sync_status" readonly="1" />
+                                <field name="marketplace_sync_date" readonly="1" />
+                                <field name="last_customer_sync_date" readonly="1" />
+                                <field name="marketplace_error_message" readonly="1" invisible="marketplace_sync_status != 'error'" />
+                            </group>
+                        </group>
+
+                        <!-- Manual sync button -->
+                        <div
+                            class="oe_button_box" name="marketplace_buttons">
+                            <button name="action_sync_to_marketplace" type="object"
+                                class="oe_stat_button" icon="fa-refresh"
+                                invisible="cartona_id == False">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_text">Manual</span>
+                                    <span class="o_stat_text">Sync</span>
+                                </div>
+                            </button>
+                        </div>
+                    </page>
+                </xpath>
+
+                <!-- Add marketplace indicator in header -->
+                <xpath expr="//div[@name='button_box']" position="inside">
+                    <button class="oe_stat_button" icon="fa-shopping-cart"
+                        invisible="is_marketplace_customer == False">
+                        <div class="o_field_widget o_stat_info">
+                            <span class="o_stat_text">Marketplace</span>
+                            <span class="o_stat_text">Customer</span>
+                        </div>
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Extend Partner Tree - Add marketplace columns -->
+        <record id="view_partner_tree_marketplace" model="ir.ui.view">
+            <field name="name">res.partner.tree.marketplace</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_tree" />
+            <field name="arch" type="xml">
+                <field name="email" position="after">
+                    <field name="cartona_id" optional="hide" />
+                    <field name="is_marketplace_customer" optional="hide" />
+                    <field name="marketplace_source" optional="hide" />
+                    <field name="last_customer_sync_date" optional="hide" />
+                </field>
+            </field>
+        </record>
+
+        <!-- Create marketplace customers search view -->
+        <record id="view_partner_search_marketplace" model="ir.ui.view">
+            <field name="name">res.partner.search.marketplace</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_res_partner_filter" />
+            <field name="arch" type="xml">
+                <xpath expr="//filter[@name='customer']" position="after">
+                    <filter string="Cartona Marketplace Customers" name="marketplace_customers"
+                        domain="[('is_marketplace_customer', '=', True)]" />
+                </xpath>
+
+                <xpath expr="//group[@name='group_by']" position="inside">
+                    <filter string="Cartona Marketplace Source" name="group_marketplace_source"
+                        domain="[]" context="{'group_by': 'marketplace_source'}" />
+                </xpath>
+
+                <xpath expr="//field[@name='name']" position="after">
+                    <field name="cartona_id" string="External Partner ID" />
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>
