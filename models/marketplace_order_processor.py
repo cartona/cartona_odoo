@@ -46,19 +46,27 @@ class MarketplaceOrderProcessor(models.Model):
             existing_order = self._find_existing_order(validated_order['order_id'])
             
             if existing_order:
-                _logger.info(f"Order {validated_order['order_id']} already exists, updating with new data")
-                success = self._update_existing_order(existing_order, validated_order, config)
-                if success:
-                    return {'success': True, 'is_new': False, 'order': existing_order, 'updated': True}
+                # Check if state mapping would result in a different state
+                marketplace_status = validated_order.get('status', 'pending')
+                new_odoo_state = self._map_marketplace_state_to_odoo(marketplace_status, config)
+                
+                if existing_order.state != new_odoo_state or existing_order.marketplace_status != marketplace_status:
+                    _logger.info(f"Order {validated_order['order_id']} exists but state differs. Current: {existing_order.state}, New: {new_odoo_state}. Updating...")
+                    success = self._update_existing_order(existing_order, validated_order, config)
+                    if success:
+                        return {'success': True, 'is_new': False, 'order': existing_order, 'updated': True}
+                    else:
+                        return False
                 else:
-                    return {'success': False, 'error': 'Failed to update existing order'}
+                    _logger.info(f"Order {validated_order['order_id']} already exists with same state, skipping")
+                    return {'success': True, 'is_new': False, 'order': existing_order, 'updated': False}
             
             # Create new order
             new_order = self._create_new_order(validated_order, config)
             
             if new_order:
                 _logger.info(f"Successfully created order: {new_order.name}")
-                return {'success': True, 'is_new': True, 'order': new_order, 'updated': False}
+                return {'success': True, 'is_new': True, 'order': new_order}
             else:
                 _logger.error("Failed to create new order")
                 return False
@@ -212,24 +220,23 @@ class MarketplaceOrderProcessor(models.Model):
             ('cartona_id', '=', order_id)
         ], limit=1)
 
-    def _map_cartona_status_to_odoo(self, cartona_status):
-        """Map Cartona status to Odoo sale order state"""
-        cartona_to_odoo_mapping = {
-            'pending': 'draft',
-            'approved': 'sale', 
-            'delivered': 'done',
-            'cancelled_by_supplier': 'cancel',
-            'cancelled_by_retailer': 'cancel',
-            'cancelled': 'cancel',
-        }
+    def _map_marketplace_state_to_odoo(self, marketplace_status, config=None):
+        """Map marketplace status to Odoo order state using configuration"""
+        if not config:
+            config = self._get_marketplace_config()
         
-        mapped_status = cartona_to_odoo_mapping.get(cartona_status, 'draft')
-        _logger.info(f"Mapped Cartona status '{cartona_status}' to Odoo state '{mapped_status}'")
-        return mapped_status
+        # Get state mapping from configuration
+        state_mapping = config.get_state_mapping()
+        
+        # Get mapped state or default to 'draft'
+        odoo_state = state_mapping.get(marketplace_status, 'draft')
+        
+        _logger.info(f"Mapped marketplace status '{marketplace_status}' to Odoo state '{odoo_state}' using {config.name} configuration")
+        return odoo_state
 
     def _create_new_order(self, order_data, config):
         """Create new sales order from marketplace data"""
-
+        
         try:
             # Find or create customer
             customer = self._find_or_create_customer(order_data['customer_data'], config)
@@ -237,10 +244,10 @@ class MarketplaceOrderProcessor(models.Model):
             if not customer:
                 _logger.error("Failed to create/find customer")
                 return None
-            
-            # Map the marketplace status to Odoo state
+                
+            # Map marketplace status to Odoo state
             marketplace_status = order_data.get('status', 'pending')
-            mapped_odoo_state = self._map_cartona_status_to_odoo(marketplace_status)
+            odoo_state = self._map_marketplace_state_to_odoo(marketplace_status, config)
                 
             # Create order
             order_vals = {
@@ -249,20 +256,13 @@ class MarketplaceOrderProcessor(models.Model):
                 'marketplace_config_id': config.id,
                 'is_marketplace_order': True,
                 'marketplace_order_number': order_data.get('marketplace_order_number'),
-                'marketplace_status': marketplace_status,  # Store original Cartona status
-                'marketplace_mapped_status': f"{marketplace_status} → {mapped_odoo_state}",  # Store mapping info
+                'marketplace_status': marketplace_status,
                 'marketplace_notes': order_data.get('notes'),
                 'delivered_by': order_data.get('delivered_by', 'delivered_by_supplier'),
                 'marketplace_payment_method': order_data.get('payment_method', 'standard'),
-                'state': mapped_odoo_state,  # Use mapped status instead of 'draft'
+                'state': odoo_state,
                 'origin': f"Marketplace Order {order_data['order_id']}",
             }
-            
-            # Set sync status to indicate successful import
-            order_vals['marketplace_sync_status'] = 'synced'
-            order_vals['marketplace_sync_date'] = fields.Datetime.now()
-            
-            _logger.info(f"Creating order with Cartona status '{marketplace_status}' mapped to Odoo state '{mapped_odoo_state}'")
             
             order = self.env['sale.order'].create(order_vals)
             
@@ -284,215 +284,30 @@ class MarketplaceOrderProcessor(models.Model):
         """Update existing order with marketplace data"""
         
         try:
-            _logger.info(f"Starting comprehensive update for order {order.name}")
+            # Map marketplace status to Odoo state
+            marketplace_status = order_data.get('status', 'pending')
+            odoo_state = self._map_marketplace_state_to_odoo(marketplace_status, config)
             
-            # Update or verify customer information
-            customer = self._find_or_create_customer(order_data['customer_data'], config)
-            if customer and customer.id != order.partner_id.id:
-                _logger.info(f"Updating customer for order {order.name} from {order.partner_id.name} to {customer.name}")
-            
-            # Get marketplace status and map to Odoo state
-            marketplace_status = order_data.get('status')
-            current_marketplace_status = order.marketplace_status
-            
-            # Prepare comprehensive update values
+            # Update order status and marketplace info
             update_vals = {
-                'partner_id': customer.id if customer else order.partner_id.id,
                 'marketplace_status': marketplace_status,
                 'marketplace_sync_date': fields.Datetime.now(),
                 'marketplace_sync_status': 'synced',
-                'marketplace_order_number': order_data.get('marketplace_order_number'),
-                'delivered_by': order_data.get('delivered_by', order.delivered_by),
-                'marketplace_payment_method': order_data.get('payment_method', order.marketplace_payment_method),
+                'state': odoo_state,  # Update Odoo state based on marketplace status
             }
             
             # Update notes if provided
             if order_data.get('notes'):
                 update_vals['marketplace_notes'] = order_data['notes']
                 
-            # If marketplace status changed, update Odoo state too
-            if marketplace_status and marketplace_status != current_marketplace_status:
-                mapped_odoo_state = self._map_cartona_status_to_odoo(marketplace_status)
-                
-                # Only update state if it's a valid transition
-                if self._is_valid_state_transition(order.state, mapped_odoo_state):
-                    if mapped_odoo_state == 'cancel':
-                        # Use Odoo's proper cancellation method
-                        try:
-                            _logger.info(f"Attempting to cancel order {order.name} due to Cartona status '{marketplace_status}'")
-                            
-                            # Diagnose potential cancellation issues
-                            issues = self._diagnose_cancellation_issues(order)
-                            if issues:
-                                _logger.warning(f"Potential cancellation issues for order {order.name}: {', '.join(issues)}")
-                            
-                            order.with_context(skip_marketplace_sync=True).action_cancel()
-                            update_vals['marketplace_mapped_status'] = f"{marketplace_status} → {mapped_odoo_state}"
-                            _logger.info(f"Successfully cancelled order {order.name}")
-                        except Exception as cancel_error:
-                            _logger.error(f"Failed to cancel order {order.name}: {cancel_error}")
-                            
-                            # Get diagnostic information for better error reporting
-                            issues = self._diagnose_cancellation_issues(order)
-                            diagnostic_info = f" Possible issues: {', '.join(issues)}" if issues else ""
-                            
-                            update_vals['marketplace_mapped_status'] = f"{marketplace_status} → {mapped_odoo_state} (cancel failed)"
-                            update_vals['marketplace_error_message'] = f"Cancellation failed: {str(cancel_error)}.{diagnostic_info}"
-                            update_vals['marketplace_sync_status'] = 'error'
-                    else:
-                        # Regular state update for non-cancellation states
-                        update_vals['state'] = mapped_odoo_state
-                        update_vals['marketplace_mapped_status'] = f"{marketplace_status} → {mapped_odoo_state}"
-                        _logger.info(f"Updating order {order.name}: Cartona status '{marketplace_status}' mapped to Odoo state '{mapped_odoo_state}'")
-                else:
-                    _logger.warning(f"Skipping state update for order {order.name}: transition from '{order.state}' to '{mapped_odoo_state}' not allowed")
-                    update_vals['marketplace_mapped_status'] = f"{marketplace_status} → {mapped_odoo_state} (blocked)"
-            
-            # Apply updates to order
             order.with_context(skip_marketplace_sync=True).write(update_vals)
             
-            # Update order lines if provided
-            if order_data.get('order_lines'):
-                self._update_order_lines(order, order_data['order_lines'])
-            
-            _logger.info(f"Successfully updated existing order {order.name}")
+            _logger.info(f"Updated existing order {order.name} - Status: {marketplace_status} -> {odoo_state}")
             return True
             
         except Exception as e:
             _logger.error(f"Error updating existing order: {e}")
             return False
-
-    def _is_valid_state_transition(self, current_state, new_state):
-        """Check if state transition is valid to prevent invalid order state changes"""
-        
-        # Define valid state transitions
-        valid_transitions = {
-            'draft': ['sale', 'cancel'],
-            'sent': ['sale', 'cancel'], 
-            'sale': ['done', 'cancel'],
-            'done': [],  # Final state - no transitions allowed
-            'cancel': []  # Final state - no transitions allowed
-        }
-        
-        # Allow transition if it's valid or if new state is the same as current
-        return new_state == current_state or new_state in valid_transitions.get(current_state, [])
-
-    def _diagnose_cancellation_issues(self, order):
-        """Diagnose why an order might not be cancellable"""
-        issues = []
-        
-        # Check if order has invoices
-        if order.invoice_ids:
-            posted_invoices = order.invoice_ids.filtered(lambda inv: inv.state == 'posted')
-            if posted_invoices:
-                issues.append(f"Order has {len(posted_invoices)} posted invoice(s)")
-        
-        # Check if order has deliveries
-        if order.picking_ids:
-            done_pickings = order.picking_ids.filtered(lambda pick: pick.state == 'done')
-            if done_pickings:
-                issues.append(f"Order has {len(done_pickings)} completed delivery(ies)")
-        
-        # Check current state
-        if order.state not in ['draft', 'sent', 'sale']:
-            issues.append(f"Order is in state '{order.state}' which may not allow cancellation")
-        
-        # Check if order is already locked
-        if hasattr(order, 'locked') and order.locked:
-            issues.append("Order is locked")
-        
-        return issues
-
-    def _update_order_lines(self, order, new_lines_data):
-        """Update order lines for existing order"""
-        
-        try:
-            # Get current marketplace line IDs
-            existing_lines = {line.marketplace_line_id: line for line in order.order_line if line.marketplace_line_id}
-            
-            # Track which lines were updated/added
-            updated_lines = set()
-            
-            for line_data in new_lines_data:
-                marketplace_line_id = line_data.get('marketplace_line_id')
-                
-                if marketplace_line_id and marketplace_line_id in existing_lines:
-                    # Update existing line
-                    existing_line = existing_lines[marketplace_line_id]
-                    self._update_order_line(existing_line, line_data)
-                    updated_lines.add(marketplace_line_id)
-                    _logger.info(f"Updated existing order line {marketplace_line_id} for order {order.name}")
-                else:
-                    # Add new line
-                    self._create_single_order_line(order, line_data)
-                    _logger.info(f"Added new order line for product {line_data.get('product_id')} to order {order.name}")
-            
-            # Optionally remove lines that are no longer in the marketplace order
-            # (commented out to be conservative - you may want to enable this)
-            # for line_id, line in existing_lines.items():
-            #     if line_id not in updated_lines:
-            #         _logger.info(f"Removing order line {line_id} from order {order.name} - no longer in marketplace")
-            #         line.unlink()
-                        
-        except Exception as e:
-            _logger.error(f"Error updating order lines for order {order.name}: {e}")
-
-    def _update_order_line(self, order_line, line_data):
-        """Update existing order line with new data"""
-        
-        try:
-            # Find or create product
-            product = self._find_or_create_product(line_data)
-            
-            if not product:
-                _logger.warning(f"Could not find/create product for {line_data['product_id']}. Skipping line update.")
-                return
-            
-            # Update line values
-            line_vals = {
-                'product_id': product.id,
-                'name': product.name,
-                'product_uom_qty': line_data['quantity'],
-                'price_unit': line_data['unit_price'],
-                'marketplace_product_id': line_data.get('product_id'),
-                'marketplace_sku': line_data.get('sku'),
-                'marketplace_notes': line_data.get('comment'),
-            }
-            
-            order_line.write(line_vals)
-            
-        except Exception as e:
-            _logger.error(f"Error updating order line {order_line.marketplace_line_id}: {e}")
-
-    def _create_single_order_line(self, order, line_data):
-        """Create a single order line"""
-        
-        try:
-            # Find or create product
-            product = self._find_or_create_product(line_data)
-            
-            if not product:
-                _logger.warning(f"Could not find/create product for {line_data['product_id']}. Skipping line.")
-                return None
-            
-            # Create order line
-            line_vals = {
-                'order_id': order.id,
-                'product_id': product.id,
-                'name': product.name,
-                'product_uom_qty': line_data['quantity'],
-                'price_unit': line_data['unit_price'],
-                'marketplace_line_id': line_data.get('marketplace_line_id'),
-                'marketplace_product_id': line_data.get('product_id'),
-                'marketplace_sku': line_data.get('sku'),
-                'marketplace_notes': line_data.get('comment'),
-            }
-            
-            return self.env['sale.order.line'].create(line_vals)
-            
-        except Exception as e:
-            _logger.error(f"Error creating order line for item {line_data.get('product_id', 'unknown')}: {e}")
-            return None
 
     def _create_order_lines(self, order, items_data):
         """Create order lines from marketplace items"""

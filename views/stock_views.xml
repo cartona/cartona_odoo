@@ -64,5 +64,23 @@
             </field>
         </record>
 
+        <!-- Extend Stock Picking Form - Add button to fill move quantity with demand -->
+        <record id="view_picking_form_fill_quantity" model="ir.ui.view">
+            <field name="name">stock.picking.form.fill.quantity</field>
+            <field name="model">stock.picking</field>
+            <field name="inherit_id" ref="stock.view_picking_form"/>
+            <field name="arch" type="xml">
+                <header position="inside">
+                    <button name="action_fill_move_quantity_with_demand"
+                            type="object"
+                            string="Auto-Fill Quantities"
+                            class="btn-primary"
+                            help="Automatically fill all move lines with their demanded quantities. Use this if you want to quickly set all quantities to the requested amount."
+                            confirm="Are you sure you want to auto-fill all move quantities with their demand? This will overwrite any manually entered quantities."
+                            invisible="state != 'confirmed'"/>
+                </header>
+            </field>
+        </record>
+
     </data>
 </odoo>

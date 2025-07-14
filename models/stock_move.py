@@ -30,7 +30,6 @@ class StockMove(models.Model):
         _logger.debug(f"[StockMove._action_done] Completed successfully")
         return result
 
-
 class StockQuant(models.Model):
     _inherit = 'stock.quant'
 
@@ -73,3 +72,12 @@ class StockLocation(models.Model):
         string="Cartona Marketplace Location Code",
         help="External location code for Cartona marketplace integration"
     )
+
+
+class StockPicking(models.Model):
+    _inherit = 'stock.picking'
+
+    def action_fill_move_quantity_with_demand(self):
+        for picking in self:
+            for move in picking.move_ids_without_package:
+                move.quantity = move.product_uom_qty

@@ -59,7 +59,6 @@ class MarketplaceSyncLog(models.Model):
     duration = fields.Float(string="Duration (seconds)")
     records_processed = fields.Integer(string="Records Processed", default=0)
     records_success = fields.Integer(string="Successful Records", default=0)
-    records_updated = fields.Integer(string="Updated Records", default=0)
     records_error = fields.Integer(string="Failed Records", default=0)
 
     user_id = fields.Many2one('res.users', string="Triggered By", default=lambda self: self.env.uid)
@@ -72,8 +71,7 @@ class MarketplaceSyncLog(models.Model):
     def log_operation(self, marketplace_config_id, operation_type, status, message, 
                      record_model=None, record_id=None, record_name=None, 
                      error_details=None, request_data=None, response_data=None,
-                     duration=None, records_processed=0, records_success=0, 
-                     records_updated=0, records_error=0):
+                     duration=None, records_processed=0, records_success=0, records_error=0):
         """Create a log entry for marketplace operations"""
         
         # Set state based on status
@@ -94,7 +92,6 @@ class MarketplaceSyncLog(models.Model):
             'duration': duration,
             'records_processed': records_processed,
             'records_success': records_success,
-            'records_updated': records_updated,
             'records_error': records_error,
             'user_id': self.env.uid,
             'action_type': 'automated',

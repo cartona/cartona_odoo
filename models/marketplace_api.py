@@ -571,7 +571,6 @@ class MarketplaceAPI(models.Model):
                 'message': 'Failed to pull orders from marketplace',
                 'orders_pulled': 0,
                 'orders_new': 0,
-                'orders_updated': 0,
                 'orders_total': 0,
                 'errors': [result.get('message', 'Unknown error')]
             }
@@ -585,7 +584,6 @@ class MarketplaceAPI(models.Model):
                 'message': 'No orders found in specified date range',
                 'orders_pulled': 0,
                 'orders_new': 0,
-                'orders_updated': 0,
                 'orders_total': 0,
                 'errors': []
             }
@@ -600,31 +598,28 @@ class MarketplaceAPI(models.Model):
         for i, order_data in enumerate(orders_data, 1):
             try:
                 result = processor.process_marketplace_order(order_data)
-                if result and result.get('success'):
+                if result:
                     orders_processed += 1
                     if result.get('is_new'):
                         orders_new += 1
                     elif result.get('updated'):
                         orders_updated += 1
                 else:
-                    error_msg = result.get('error', 'Unknown error') if result else 'Processing failed'
-                    errors.append(f"Failed to process order {i}: {order_data.get('order_id', 'unknown')} - {error_msg}")
+                    errors.append(f"Failed to process order {i}: {order_data.get('order_id', 'unknown')}")
                     
             except Exception as e:
                 _logger.error(f"Failed to process order {i}: {order_data.get('order_id', 'unknown')}")
                 errors.append(f"Error processing order {i}: {str(e)}")
         
-        # Enhanced logging with separate new/update tracking
+        # Log success if any orders processed
         if orders_processed > 0:
-            log_message = f"Successfully processed {orders_processed} orders ({orders_new} new, {orders_updated} updated)"
             self.env['marketplace.sync.log'].log_operation(
                 marketplace_config_id=config.id,
                 operation_type='order_pull',
                 status='success',
-                message=log_message,
+                message=f"Successfully processed {orders_processed} orders ({orders_new} new, {orders_updated} updated)",
                 records_processed=orders_processed,
-                records_success=orders_new,
-                records_updated=orders_updated,
+                records_success=orders_new + orders_updated,
                 records_error=len(errors)
             )
         elif errors:
@@ -633,13 +628,13 @@ class MarketplaceAPI(models.Model):
                 operation_type='order_pull',
                 status='error',
                 message=f"Order pull completed with errors: {len(errors)} failed.",
-                records_processed=len(orders_data),
+                records_processed=orders_processed,
                 records_error=len(errors)
             )
         
         return {
             'success': True,
-            'message': f'Processed {orders_processed} orders successfully',
+            'message': f'Processed {orders_processed} orders successfully ({orders_new} new, {orders_updated} updated)',
             'orders_pulled': len(orders_data),
             'orders_new': orders_new,
             'orders_updated': orders_updated,

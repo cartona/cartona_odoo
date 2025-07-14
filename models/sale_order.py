@@ -49,12 +49,6 @@ class SaleOrder(models.Model):
         help="Current status in the marketplace system"
     )
     
-    marketplace_mapped_status = fields.Char(
-        string="Mapped Status", 
-        help="Marketplace status mapped to Odoo state when imported",
-        readonly=True
-    )
-    
     marketplace_payment_method = fields.Char(
         string="Payment Method",
         help="Payment method used in marketplace"
@@ -409,65 +403,6 @@ Business Rules:
                 'title': _("Status Sync Test Results"),
                 'message': message,
                 'type': 'info',
-            }
-        }
-
-    def action_test_marketplace_cancellation(self):
-        """Test marketplace order cancellation and diagnose issues"""
-        self.ensure_one()
-        
-        if not self.is_marketplace_order:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': _("Test Not Available"),
-                    'message': _("This is not a marketplace order"),
-                    'type': 'warning',
-                }
-            }
-        
-        # Get diagnostic information using order processor
-        processor = self.env['marketplace.order.processor']
-        issues = processor._diagnose_cancellation_issues(self)
-        
-        # Try to determine if cancellation would succeed
-        can_cancel = len(issues) == 0 and self.state in ['draft', 'sent', 'sale']
-        
-        # Prepare detailed report
-        report_lines = [
-            f"Order: {self.name}",
-            f"Current State: {self.state}",
-            f"Marketplace Status: {self.marketplace_status}",
-            f"Can Cancel: {'Yes' if can_cancel else 'No'}",
-            "",
-            "Diagnostic Information:"
-        ]
-        
-        if issues:
-            for issue in issues:
-                report_lines.append(f"⚠️ {issue}")
-        else:
-            report_lines.append("✅ No blocking issues found")
-        
-        # Add additional information
-        report_lines.extend([
-            "",
-            "Additional Details:",
-            f"• Has Invoices: {'Yes' if self.invoice_ids else 'No'}",
-            f"• Has Deliveries: {'Yes' if self.picking_ids else 'No'}",
-            f"• Is Locked: {'Yes' if hasattr(self, 'locked') and self.locked else 'No'}",
-        ])
-        
-        message = "\n".join(report_lines)
-        
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _("Cancellation Diagnostic Results"),
-                'message': message,
-                'type': 'info' if can_cancel else 'warning',
             }
         }
 

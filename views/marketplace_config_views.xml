@@ -170,7 +170,7 @@
                                 </h3>
                                 
                                 <group>
-                                    <field name="name" 
+                                    <field name="name" readonly="1"
                                            style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"
                                            placeholder="Enter marketplace name"/>
                                 </group>
@@ -193,7 +193,7 @@
                                            style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"/>
                                     <field name="auth_token" password="True" 
                                            style="padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"/>
-                                    <field name="auth_header"/>
+                                    <field name="auth_header" invisible="1"/>
                                 </group>
                             </div>
                         </div>

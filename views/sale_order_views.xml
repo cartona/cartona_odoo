@@ -43,15 +43,6 @@
                             <span class="o_stat_text">Sync</span>
                         </div>
                     </button>
-
-                    <button name="action_test_marketplace_cancellation" type="object"
-                        class="oe_stat_button" icon="fa-times-circle"
-                        invisible="cartona_id == False or is_marketplace_order == False">
-                        <div class="o_field_widget o_stat_info">
-                            <span class="o_stat_text">Test</span>
-                            <span class="o_stat_text">Cancel</span>
-                        </div>
-                    </button>
                 </xpath>
 
                 <!-- Add marketplace tab -->
@@ -63,7 +54,6 @@
                                 <field name="cartona_id" readonly="1" />
                                 <field name="marketplace_order_number" readonly="1" />
                                 <field name="marketplace_status" readonly="1" />
-                                <field name="marketplace_mapped_status" readonly="1" />
                                 <field name="delivered_by" />
                                 <field name="marketplace_payment_method" readonly="1" />
                             </group>
@@ -92,8 +82,6 @@
                     <field name="cartona_id" optional="hide" />
                     <field name="is_marketplace_order" optional="hide" />
                     <field name="marketplace_config_id" optional="hide" />
-                    <field name="marketplace_status" optional="hide" />
-                    <field name="marketplace_mapped_status" optional="hide" />
                     <field name="delivered_by" optional="hide" />
                     <field name="marketplace_sync_status" optional="hide" />
                     <field name="marketplace_sync_date" optional="hide" />

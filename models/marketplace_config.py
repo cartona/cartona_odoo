@@ -13,7 +13,7 @@ class MarketplaceConfig(models.Model):
     _order = 'sequence, name'
 
     # Basic Configuration
-    name = fields.Char(string="Marketplace Name", required=True, 
+    name = fields.Char(string="Marketplace Name", required=True, tracking=True, default="Cartona Marketplace",
                       help="Display name for this marketplace (e.g., 'Cartona', 'Amazon', 'eBay')")
     sequence = fields.Integer(string="Sequence", default=10)
     active = fields.Boolean(string="Active", default=True)
@@ -58,6 +58,30 @@ class MarketplaceConfig(models.Model):
     total_products_synced = fields.Integer(string="Products Synced", readonly=True, default=0)
     total_orders_pulled = fields.Integer(string="Orders Pulled", readonly=True, default=0)
     last_order_pull = fields.Datetime(string="Last Order Pull", readonly=True)
+    
+    # State Mapping Configuration
+    enable_custom_state_mapping = fields.Boolean(
+        string="Enable Custom State Mapping",
+        default=False,
+        help="Enable custom mapping from marketplace states to Odoo order states"
+    )
+    custom_state_mapping = fields.Text(
+        string="Custom State Mapping",
+        help="JSON format: {'marketplace_status': 'odoo_state'}. Example: {'pending': 'draft', 'approved': 'sale'}",
+        default="""{
+    "pending": "draft",
+    "approved": "sale", 
+    "processing": "sale",
+    "assigned_to_salesman": "sale",
+    "shipped": "sale",
+    "delivered": "done",
+    "cancelled_by_supplier": "cancel",
+    "cancelled_by_retailer": "cancel",
+    "cancelled": "cancel",
+    "confirmed": "sale",
+    "ready_for_pickup": "sale"
+}"""
+    )
     
     # Note: Removed state field to avoid conflicts with Odoo's internal state management
     
@@ -352,37 +376,19 @@ class MarketplaceConfig(models.Model):
                 ('cartona_id', '!=', False)
             ])
             newly_imported = after_count - before_count
-            
-            # Extract results from API response
-            orders_new = result.get('orders_new', 0)
-            orders_updated = result.get('orders_updated', 0)
-            orders_total = result.get('orders_total', 0)
-            
             # Update stats with actual totals
             self._update_sync_stats(orders_count=after_count, is_increment=False)
-            
-            # Create enhanced notification message
-            if orders_new > 0 and orders_updated > 0:
-                message = _("Pulled %d orders: %d new, %d updated (%d total in system)") % (
-                    orders_total, orders_new, orders_updated, after_count
-                )
-            elif orders_new > 0:
-                message = _("Pulled %d new orders (%d total in system)") % (
-                    orders_new, after_count
-                )
-            elif orders_updated > 0:
-                message = _("Updated %d existing orders (%d total in system)") % (
-                    orders_updated, after_count
-                )
-            else:
-                message = _("No new orders found (%d total in system)") % after_count
-            
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
                     'title': _("Order Pull Complete"),
-                    'message': message,
+                    'message': _("Pulled %d orders (%d new, %d updated, %d total imported)") % (
+                        result.get('orders_pulled', 0),
+                        result.get('orders_new', 0),
+                        result.get('orders_updated', 0),
+                        after_count
+                    ),
                     'type': 'success',
                 }
             }
@@ -669,6 +675,40 @@ class MarketplaceConfig(models.Model):
                 'sticky': True,
             }
         }
+
+    def get_state_mapping(self):
+        """Get state mapping configuration for order pulling"""
+        self.ensure_one()
+        
+        # Default state mapping
+        default_mapping = {
+            'pending': 'draft',
+            'approved': 'sale',
+            'processing': 'sale',
+            'assigned_to_salesman': 'sale',
+            'shipped': 'sale',
+            'delivered': 'done',
+            'cancelled_by_supplier': 'cancel',
+            'cancelled_by_retailer': 'cancel',
+            'cancelled': 'cancel',
+            'confirmed': 'sale',
+            'ready_for_pickup': 'sale',
+        }
+        
+        # Use custom mapping if enabled
+        if self.enable_custom_state_mapping and self.custom_state_mapping:
+            try:
+                import json
+                custom_mapping = json.loads(self.custom_state_mapping)
+                if isinstance(custom_mapping, dict):
+                    _logger.info(f"Using custom state mapping for {self.name}")
+                    return custom_mapping
+                else:
+                    _logger.warning(f"Invalid custom state mapping format for {self.name}, using default")
+            except (json.JSONDecodeError, Exception) as e:
+                _logger.warning(f"Failed to parse custom state mapping for {self.name}: {e}, using default")
+        
+        return default_mapping
 
     def _update_product_stock(self, product, stock_quantity):
         """Update product stock quantity using stock.quant
