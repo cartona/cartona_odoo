@@ -257,25 +257,6 @@ class ResPartner(models.Model):
             
         return self.search([('cartona_id', '=', cartona_id)], limit=1)
 
-    def get_marketplace_customer_info(self):
-        """Get customer information for marketplace orders"""
-        self.ensure_one()
-        
-        return {
-            'customer_id': self.cartona_id,
-            'name': self.name,
-            'email': self.email,
-            'phone': self.phone,
-            'address': {
-                'street': self.street,
-                'street2': self.street2,
-                'city': self.city,
-                'zip': self.zip,
-                'state': self.state_id.name if self.state_id else '',
-                'country': self.country_id.name if self.country_id else '',
-            }
-        }
-
     def action_sync_to_marketplace(self):
         """Manual sync customer to marketplace"""
         self.ensure_one()

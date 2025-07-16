@@ -474,34 +474,6 @@ Business Rules:
             
         return self.search([('cartona_id', '=', cartona_id)], limit=1)
 
-    def get_marketplace_order_info(self):
-        """Get order information for marketplace sync"""
-        self.ensure_one()
-        
-        order_lines = []
-        for line in self.order_line:
-            order_lines.append({
-                'product_id': line.product_id.cartona_id,
-                'product_name': line.product_id.name,
-                'sku': line.product_id.default_code or line.product_id.barcode,
-                'quantity': line.product_uom_qty,
-                'price_unit': line.price_unit,
-                'subtotal': line.price_subtotal,
-            })
-        
-        return {
-            'order_id': self.cartona_id,
-            'order_number': self.name,
-            'customer_id': self.partner_id.cartona_id,
-            'status': self._map_odoo_status_to_marketplace(),
-            'total_amount': self.amount_total,
-            'currency': self.currency_id.name,
-            'order_date': self.date_order.isoformat() if self.date_order else None,
-            'order_lines': order_lines,
-            'delivery_address': self._get_delivery_address_info(),
-            'notes': self.note or ''
-        }
-
     def _get_delivery_address_info(self):
         """Get delivery address for marketplace sync"""
         delivery_partner = self.partner_shipping_id or self.partner_id

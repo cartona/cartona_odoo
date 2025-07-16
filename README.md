@@ -1,5 +1,7 @@
 # Cartona Marketplace Integration
 
+> **Note:** This module is designed for Odoo 18.
+
 Universal marketplace integration module for Odoo suppliers to connect with Cartona, Amazon, eBay, Shopify, and other marketplaces.
 
 ## Overview
@@ -26,7 +28,6 @@ This module enables suppliers to:
 - **Product Matching**: Reliable product identification across platforms
 
 ### 📋 Order Management
-- **Automatic Order Pull**: Webhook-based order processing
 - **Customer Creation**: Auto-create customers from marketplace orders
 - **Status Synchronization**: Bidirectional order status updates
 - **Order Line Details**: Complete order information preservation
@@ -85,15 +86,8 @@ This module enables suppliers to:
    - Products sync automatically on price/stock changes
 
 3. **Order Processing**:
-   - Configure webhook endpoint: `/marketplace_integration/webhook/orders`
    - Orders import automatically every 15 minutes
    - Customer records created automatically
-
-### Webhook Configuration
-Configure your marketplace to send webhooks to:
-- **Orders**: `https://your-odoo-domain.com/marketplace_integration/webhook/orders`
-- **Status Updates**: `https://your-odoo-domain.com/marketplace_integration/webhook/status`
-- **Test**: `https://your-odoo-domain.com/marketplace_integration/webhook/test`
 
 ## Usage
 
@@ -104,10 +98,9 @@ Configure your marketplace to send webhooks to:
 4. **Manual Sync**: Use "Manual Sync" button when needed
 
 ### Order Management
-1. **Automatic Pull**: Orders import automatically from webhooks
-2. **Customer Creation**: Customers created automatically from order data
-3. **Status Updates**: Order statuses sync bidirectionally
-4. **Order Processing**: Use standard Odoo sales order workflow
+1. **Customer Creation**: Customers created automatically from order data
+2. **Status Updates**: Order statuses sync bidirectionally
+3. **Order Processing**: Use standard Odoo sales order workflow
 
 ### Monitoring
 1. **Dashboard**: View sync status for all marketplaces

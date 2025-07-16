@@ -35,13 +35,6 @@ class ProductTemplate(models.Model):
     marketplace_sync_date = fields.Datetime(string="Last Sync Date", readonly=True)
     marketplace_error_message = fields.Text(string="Sync Error", readonly=True)
     
-    # Marketplace-specific fields
-    marketplace_ids = fields.One2many(
-        'product.marketplace.link', 'product_tmpl_id', 
-        string="Cartona Marketplace Links",
-        help="Links to this product in different Cartona marketplaces"
-    )
-    
     # Control fields
     marketplace_sync_enabled = fields.Boolean(
         string="Enable Cartona Marketplace Sync", 
@@ -268,30 +261,3 @@ class ProductTemplate(models.Model):
             _logger.info(f"Created placeholder product for external ID: {cartona_id}")
             
         return product
-
-
-class ProductMarketplaceLink(models.Model):
-    """Track product links across multiple marketplaces"""
-    _name = 'product.marketplace.link'
-    _description = 'Product Marketplace Links'
-    _rec_name = 'marketplace_config_id'
-
-    product_tmpl_id = fields.Many2one('product.template', required=True, ondelete='cascade')
-    marketplace_config_id = fields.Many2one('marketplace.config', required=True, ondelete='cascade')
-    external_id = fields.Char(string="External Product ID", required=True, index=True)
-    last_sync_date = fields.Datetime(string="Last Sync Date")
-    sync_status = fields.Selection([
-        ('pending', 'Pending'),
-        ('synced', 'Synced'),
-        ('error', 'Error'),
-    ], default='pending')
-    error_message = fields.Text(string="Error Message")
-
-    _sql_constraints = [
-        ('unique_product_marketplace', 
-         'unique(product_tmpl_id, marketplace_config_id)', 
-         'Product can only be linked once per marketplace'),
-        ('unique_external_id_marketplace',
-         'unique(external_id, marketplace_config_id)',
-         'External ID must be unique per marketplace'),
-    ]

@@ -285,20 +285,6 @@ class ProductProduct(models.Model):
             
         return variant
 
-    def get_stock_info(self):
-        """Get stock information for marketplace sync"""
-        self.ensure_one()
-        
-        return {
-            'product_id': self.cartona_id,
-            'sku': self.default_code or self.barcode or str(self.id),
-            'qty_available': self.qty_available,
-            'virtual_available': self.virtual_available,
-            'incoming_qty': self.incoming_qty,
-            'outgoing_qty': self.outgoing_qty,
-            'location_ids': self._get_stock_locations()
-        }
-
     def _get_stock_locations(self):
         """Get stock locations for this product"""
         locations = self.env['stock.location'].search([

@@ -499,21 +499,6 @@ class MarketplaceConfig(models.Model):
         return super().create(vals_list)
 
     @api.model
-    def get_or_create_config(self):
-        """Get existing config or create a default one"""
-        config = self.search([], limit=1)
-        if not config:
-            config = self.create({
-                'name': 'Cartona Integration',
-                'api_base_url': 'https://supplier-integrations.cartona.com/api/v1/',
-                'auth_header': 'AuthorizationToken',
-                'active': True,
-            })
-            # Initialize stats with actual counts
-            config.recalculate_sync_stats()
-        return config
-
-    @api.model
     def default_get(self, fields_list):
         """Override default_get to ensure stats are up to date"""
         res = super().default_get(fields_list)

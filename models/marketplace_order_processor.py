@@ -403,67 +403,6 @@ class MarketplaceOrderProcessor(models.Model):
         except Exception as e:
             _logger.error(f"Error completing delivery {picking.name}: {e}")
 
-    def test_cartona_state_transitions(self, order_id, test_statuses=None):
-        """
-        Test method to demonstrate and verify Cartona state transitions.
-        
-        This is useful for:
-        - Testing the state transition logic
-        - Debugging order processing issues
-        - Demonstrating the workflow to users
-        
-        Args:
-            order_id (str): Cartona order ID to test
-            test_statuses (list): List of statuses to test (optional)
-            
-        Returns:
-            dict: Test results with before/after states
-        """
-        
-        if test_statuses is None:
-            # Default test sequence covers the main workflow
-            test_statuses = ['approved', 'assigned_to_salesman', 'delivered', 'cancelled']
-        
-        order = self.env['sale.order'].search([('cartona_id', '=', order_id)], limit=1)
-        if not order:
-            return {'error': f'Order with cartona_id {order_id} not found'}
-        
-        results = []
-        for status in test_statuses:
-            try:
-                # Capture initial states
-                initial_state = order.state
-                initial_delivery_states = [p.state for p in order.picking_ids]
-                
-                _logger.info(f"Testing transition to '{status}' for order {order.name}")
-                self._apply_cartona_state_action(order, status)
-                
-                # Capture final states
-                final_state = order.state
-                final_delivery_states = [p.state for p in order.picking_ids]
-                
-                results.append({
-                    'status': status,
-                    'success': True,
-                    'initial_order_state': initial_state,
-                    'final_order_state': final_state,
-                    'initial_delivery_states': initial_delivery_states,
-                    'final_delivery_states': final_delivery_states
-                })
-                
-            except Exception as e:
-                results.append({
-                    'status': status,
-                    'success': False,
-                    'error': str(e)
-                })
-        
-        return {
-            'order_name': order.name,
-            'cartona_id': order_id,
-            'test_results': results
-        }
-
     def _update_existing_order(self, order, order_data, config):
         """
         Update existing order with new marketplace data and handle state changes.
@@ -604,20 +543,6 @@ class MarketplaceOrderProcessor(models.Model):
         except Exception as e:
             _logger.error(f"Error finding/creating product: {e}")
             return None
-
-    def _log_error(self, config, message, order_data=None, error_details=None):
-        """Log error for order processing"""
-        
-        self.env['marketplace.sync.log'].log_operation(
-            marketplace_config_id=config.id,
-            operation_type='order_pull',
-            status='error',
-            message=message,
-            error_details=error_details,
-            request_data=str(order_data) if order_data else None,
-            records_processed=1,
-            records_error=1
-        )
 
     def _extract_shipping_address(self, retailer_data):
         """Extract shipping address from Cartona retailer data"""
