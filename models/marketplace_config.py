@@ -13,7 +13,7 @@ class MarketplaceConfig(models.Model):
     _order = 'sequence, name'
 
     # Basic Configuration
-    name = fields.Char(string="Marketplace Name", required=True, tracking=True, default="Cartona Marketplace",
+    name = fields.Char(string="Marketplace Name", required=True, default="Cartona Marketplace",
                       help="Display name for this marketplace (e.g., 'Cartona', 'Amazon', 'eBay')")
     sequence = fields.Integer(string="Sequence", default=10)
     active = fields.Boolean(string="Active", default=True)
@@ -67,19 +67,13 @@ class MarketplaceConfig(models.Model):
     )
     custom_state_mapping = fields.Text(
         string="Custom State Mapping",
-        help="JSON format: {'marketplace_status': 'odoo_state'}. Example: {'pending': 'draft', 'approved': 'sale'}",
+        help="JSON format: {'marketplace_status': 'odoo_state'}. Example: {'approved': 'sale', 'cancel': 'cancel'}",
         default="""{
-    "pending": "draft",
-    "approved": "sale", 
-    "processing": "sale",
-    "assigned_to_salesman": "sale",
-    "shipped": "sale",
-    "delivered": "done",
-    "cancelled_by_supplier": "cancel",
-    "cancelled_by_retailer": "cancel",
+    "approved": "sale",
     "cancelled": "cancel",
-    "confirmed": "sale",
-    "ready_for_pickup": "sale"
+    "assigned_to_salesman": "sale",
+    "delivered": "done",
+    "return": "draft"
 }"""
     )
     
@@ -361,23 +355,39 @@ class MarketplaceConfig(models.Model):
                 raise UserError(_("Sync failed: %s") % str(e))
 
     def manual_pull_orders(self):
-        """Manual order pull from Cartona marketplace"""
+        """
+        Manual order pull from Cartona marketplace.
+        
+        This method:
+        1. Pulls orders from Cartona API
+        2. Processes each order (creates new or updates existing)
+        3. Applies proper state transitions
+        4. Updates statistics and shows results
+        
+        Returns:
+            dict: Action result with notification showing import results
+        """
         self.ensure_one()
         # Get marketplace API client  
         api_client = self.env['marketplace.api'].with_context(marketplace_config_id=self.id)
         try:
-            # Get count before import
+            # Get count before import for statistics
             before_count = self.env['sale.order'].search_count([
                 ('cartona_id', '!=', False)
             ])
+            
+            # Pull and process orders from Cartona
             result = api_client.pull_and_process_orders()
-            # Get count after import
+            
+            # Get count after import for statistics
             after_count = self.env['sale.order'].search_count([
                 ('cartona_id', '!=', False)
             ])
             newly_imported = after_count - before_count
+            
             # Update stats with actual totals
             self._update_sync_stats(orders_count=after_count, is_increment=False)
+            
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -516,9 +526,9 @@ class MarketplaceConfig(models.Model):
         return res
 
     def manual_pull_products(self):
-        """Manual import of products from Cartona marketplace (single API call, no pagination)"""
+        """Manual import of products from Cartona marketplace (pages 1 to 4)"""
         self.ensure_one()
-        _logger.info("--- Starting Manual Product Pull from Cartona (single call) ---")
+        _logger.info("--- Starting Manual Product Pull from Cartona (pages 1 to 4) ---")
 
         imported = 0
         updated = 0
@@ -526,15 +536,20 @@ class MarketplaceConfig(models.Model):
         total = 0
         api_client = self.env['marketplace.api'].with_context(marketplace_config_id=self.id)
         Product = self.env['product.template']
+        all_products = []
         try:
-            result = api_client.get_supplier_products()
-            if not result or (isinstance(result, dict) and not result.get('success', True)):
-                _logger.error(f"Failed to fetch products from Cartona: {result.get('error') if isinstance(result, dict) else result}")
-                raise UserError(_("Failed to fetch products from Cartona: %s") % (result.get('error') if isinstance(result, dict) else result))
-            products = result.get('data') if isinstance(result, dict) else result
-            if not products:
-                raise UserError(_("No products returned from Cartona API."))
-            for prod in products:
+            # Loop over pages 1 to 4 and aggregate all products
+            for page in range(1, 5):
+                result = api_client.get_supplier_products(page=page)
+                if not result or (isinstance(result, dict) and not result.get('success', True)):
+                    _logger.error(f"Failed to fetch products from Cartona (page {page}): {result.get('error') if isinstance(result, dict) else result}")
+                    continue
+                products = result.get('data') if isinstance(result, dict) else result
+                if products:
+                    all_products.extend(products)
+            if not all_products:
+                raise UserError(_("No products returned from Cartona API (pages 1-4)."))
+            for prod in all_products:
                 cartona_id = prod.get('id') or prod.get('cartona_id') or prod.get('supplier_product_id')
                 internal_product_id = prod.get('internal_product_id')
                 _logger.info(f"Internal Product ID: {internal_product_id}")
@@ -548,7 +563,6 @@ class MarketplaceConfig(models.Model):
                 except (TypeError, ValueError):
                     _logger.warning(f"Invalid stock quantity in API response for product {cartona_id}: {available_stock_quantity}. Setting to 0.")
                     available_stock_quantity = 0.0
-                
                 vals = {
                     'cartona_id': cartona_id,
                     'name': prod.get('name') or prod.get('suppler_prodcut_name') or prod.get('product_name') or 'Cartona Product',
@@ -612,7 +626,7 @@ class MarketplaceConfig(models.Model):
                 'tag': 'display_notification',
                 'params': {
                     'title': _("Product Import Complete"),
-                    'message': _("Imported %d new, updated %d products from Cartona. (Total processed: %d, Errors: %d)") % (imported, updated, total, errors),
+                    'message': _(f"Imported {imported} new, updated {updated} products from Cartona. (Total processed: {total}, Errors: {errors})"),
                     'type': 'success' if errors == 0 else 'warning',
                 }
             }
@@ -677,22 +691,34 @@ class MarketplaceConfig(models.Model):
         }
 
     def get_state_mapping(self):
-        """Get state mapping configuration for order pulling"""
+        """
+        Get state mapping configuration for order pulling.
+        
+        This method returns the mapping between Cartona marketplace statuses
+        and Odoo order states. The actual state transitions are handled by
+        proper Odoo actions in _apply_cartona_state_action().
+        
+        Cartona Status → Odoo State:
+        - approved → sale (order confirmed)
+        - cancelled → cancel (order cancelled)
+        - assigned_to_salesman → sale (will be handled by delivery assignment)
+        - delivered → done (order completed)
+        - return → draft (returns need manual handling)
+        
+        Returns:
+            dict: Mapping of marketplace statuses to Odoo states
+        """
         self.ensure_one()
         
-        # Default state mapping
+        # Simplified state mapping based on Cartona requirements
+        # Note: The actual state transitions are handled by proper Odoo actions
+        # This mapping is just for reference - the real logic is in _apply_cartona_state_action
         default_mapping = {
-            'pending': 'draft',
             'approved': 'sale',
-            'processing': 'sale',
-            'assigned_to_salesman': 'sale',
-            'shipped': 'sale',
-            'delivered': 'done',
-            'cancelled_by_supplier': 'cancel',
-            'cancelled_by_retailer': 'cancel',
             'cancelled': 'cancel',
-            'confirmed': 'sale',
-            'ready_for_pickup': 'sale',
+            'assigned_to_salesman': 'sale',  # Will be handled by delivery assignment
+            'delivered': 'done',
+            'return': 'draft',  # Returns need manual handling
         }
         
         # Use custom mapping if enabled

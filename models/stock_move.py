@@ -81,3 +81,32 @@ class StockPicking(models.Model):
         for picking in self:
             for move in picking.move_ids_without_package:
                 move.quantity = move.product_uom_qty
+
+    def button_validate(self):
+        """Override button_validate to trigger Cartona sync when delivery is validated"""
+        # Call the original button_validate method
+        result = super().button_validate()
+        
+        # After validation, check if this is an outgoing delivery that became 'done'
+        # and if it's related to a Cartona order
+        if not self.env.context.get('skip_marketplace_sync'):
+            for picking in self:
+                if (picking.picking_type_code == 'outgoing' and 
+                    picking.state == 'done' and 
+                    picking.sale_id and 
+                    picking.sale_id.cartona_id and 
+                    picking.sale_id.marketplace_config_id):
+                    
+                    # Check if this order is delivered by supplier (business rule)
+                    if picking.sale_id.delivered_by == 'delivered_by_supplier':
+                        _logger.info(f"Delivery {picking.name} validated to 'done' - triggering Cartona sync for order {picking.sale_id.name}")
+                        
+                        # Trigger sync to update Cartona status to 'assigned_to_salesman'
+                        picking.sale_id.with_delay(
+                            channel='marketplace',
+                            description=f"Sync delivery validation for order {picking.sale_id.name} to Cartona"
+                        )._sync_delivery_validation_to_cartona()
+                    else:
+                        _logger.info(f"Delivery {picking.name} validated but order {picking.sale_id.name} is delivered_by_cartona - skipping sync")
+        
+        return result

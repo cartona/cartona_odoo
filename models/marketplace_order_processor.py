@@ -235,44 +235,60 @@ class MarketplaceOrderProcessor(models.Model):
         return odoo_state
 
     def _create_new_order(self, order_data, config):
-        """Create new sales order from marketplace data"""
+        """
+        Create new sales order from marketplace data with proper state transitions.
+        
+        This method creates orders in draft state first, then applies the correct
+        Odoo actions based on the Cartona status to ensure all business logic
+        (delivery creation, inventory allocation, etc.) is properly executed.
+        
+        Args:
+            order_data (dict): Normalized order data from Cartona
+            config (marketplace.config): Marketplace configuration record
+            
+        Returns:
+            sale.order: Created order record or None if failed
+        """
         
         try:
-            # Find or create customer
+            # Find or create customer from Cartona retailer data
             customer = self._find_or_create_customer(order_data['customer_data'], config)
             
             if not customer:
                 _logger.error("Failed to create/find customer")
                 return None
                 
-            # Map marketplace status to Odoo state
             marketplace_status = order_data.get('status', 'pending')
-            odoo_state = self._map_marketplace_state_to_odoo(marketplace_status, config)
                 
-            # Create order
+            # Always create order in draft state first - this is crucial!
+            # We'll apply proper state transitions afterward using Odoo actions
             order_vals = {
                 'partner_id': customer.id,
-                'cartona_id': order_data['order_id'],
+                'cartona_id': order_data['order_id'],  # External ID for sync
                 'marketplace_config_id': config.id,
                 'is_marketplace_order': True,
                 'marketplace_order_number': order_data.get('marketplace_order_number'),
-                'marketplace_status': marketplace_status,
+                'marketplace_status': marketplace_status,  # Store original Cartona status
                 'marketplace_notes': order_data.get('notes'),
                 'delivered_by': order_data.get('delivered_by', 'delivered_by_supplier'),
                 'marketplace_payment_method': order_data.get('payment_method', 'standard'),
-                'state': odoo_state,
+                'state': 'draft',  # Always start in draft - proper transitions come next
                 'origin': f"Marketplace Order {order_data['order_id']}",
             }
             
             order = self.env['sale.order'].create(order_vals)
             
-            # Create order lines
+            # Create order lines from Cartona order details
             success = self._create_order_lines(order, order_data['order_lines'])
             
             if not success:
                 _logger.error("Order line creation failed, deleting order")
                 order.unlink()
                 return None
+            
+            # Now apply proper state transitions based on Cartona status
+            # This ensures all business consequences happen correctly
+            self._apply_cartona_state_action(order, marketplace_status)
                 
             return order
             
@@ -280,29 +296,217 @@ class MarketplaceOrderProcessor(models.Model):
             _logger.error(f"Error creating order: {e}")
             return None
 
-    def _update_existing_order(self, order, order_data, config):
-        """Update existing order with marketplace data"""
+    def _apply_cartona_state_action(self, order, cartona_status):
+        """
+        Apply proper Odoo actions based on Cartona status instead of just setting states.
+        
+        This is the core method that ensures business logic is properly executed:
+        - 'approved': Confirms order (creates deliveries, allocates inventory)
+        - 'assigned_to_salesman': Confirms + assigns delivery (ready state)
+        - 'delivered': Confirms + assigns + completes delivery (done state)
+        - 'cancelled': Properly cancels order and all related deliveries
+        
+        Args:
+            order (sale.order): The order to transition
+            cartona_status (str): Cartona marketplace status
+        """
         
         try:
-            # Map marketplace status to Odoo state
-            marketplace_status = order_data.get('status', 'pending')
-            odoo_state = self._map_marketplace_state_to_odoo(marketplace_status, config)
+            _logger.info(f"Applying Cartona status '{cartona_status}' to order {order.name}")
             
-            # Update order status and marketplace info
+            # Use context to skip marketplace sync and avoid infinite loops
+            order_ctx = order.with_context(skip_marketplace_sync=True)
+            
+            if cartona_status == 'approved':
+                # APPROVED: Transition from draft to sale
+                # This creates delivery orders, allocates inventory, sends notifications
+                if order.state == 'draft':
+                    order_ctx.action_confirm()
+                    _logger.info(f"Order {order.name} confirmed (approved) - deliveries created")
+                    
+            elif cartona_status == 'assigned_to_salesman':
+                # ASSIGNED TO SALESMAN: Confirm order + assign delivery (ready state)
+                # First confirm if still in draft
+                if order.state == 'draft':
+                    order_ctx.action_confirm()
+                
+                # Then try to assign all outgoing deliveries (reserve inventory)
+                for picking in order.picking_ids.filtered(lambda p: p.picking_type_code == 'outgoing'):
+                    if picking.state in ['confirmed', 'waiting']:
+                        try:
+                            picking.action_assign()
+                            _logger.info(f"Delivery {picking.name} assigned (ready) for order {order.name}")
+                        except Exception as e:
+                            _logger.warning(f"Could not assign delivery {picking.name}: {e}")
+                            
+            elif cartona_status == 'delivered':
+                # DELIVERED: Complete the entire order workflow
+                # Confirm order if needed
+                if order.state == 'draft':
+                    order_ctx.action_confirm()
+                
+                # Complete all outgoing deliveries
+                for picking in order.picking_ids.filtered(lambda p: p.picking_type_code == 'outgoing'):
+                    # First assign if not already assigned
+                    if picking.state in ['confirmed', 'waiting']:
+                        picking.action_assign()
+                    # Then complete the delivery
+                    if picking.state == 'assigned':
+                        self._complete_delivery(picking)
+                        
+            elif cartona_status in ['cancelled', 'cancelled_by_retailer', 'cancelled_by_cartona']:
+                # CANCELLED: Properly cancel order and all related operations
+                # This cancels deliveries, releases inventory, handles all consequences
+                if order.state not in ['cancel', 'done']:
+                    order_ctx.action_cancel()
+                    _logger.info(f"Order {order.name} cancelled - all deliveries cancelled")
+                    
+            elif cartona_status == 'return':
+                # RETURN: Special case - requires manual handling
+                # Returns are complex and need human intervention
+                _logger.info(f"Order {order.name} marked as return - manual handling required")
+                
+        except Exception as e:
+            _logger.error(f"Error applying Cartona state '{cartona_status}' to order {order.name}: {e}")
+            # Store error info in order for debugging
+            order.write({
+                'marketplace_sync_status': 'error',
+                'marketplace_error_message': f"State transition error: {str(e)}"
+            })
+
+    def _complete_delivery(self, picking):
+        """
+        Complete delivery by auto-filling quantities and validating.
+        
+        This method automatically:
+        1. Sets quantity_done = product_uom_qty for all moves
+        2. Validates the picking (completes delivery)
+        3. Updates inventory accordingly
+        
+        Args:
+            picking (stock.picking): The delivery to complete
+        """
+        
+        try:
+            # Auto-fill all move quantities with their demand quantities
+            # This is equivalent to manually entering quantities in the delivery
+            for move in picking.move_ids:
+                if move.state in ['confirmed', 'waiting', 'assigned']:
+                    move.quantity_done = move.product_uom_qty
+                    
+            # Validate the picking - this completes the delivery
+            # Updates inventory, creates accounting entries, etc.
+            if picking.state == 'assigned':
+                picking.button_validate()
+                _logger.info(f"Delivery {picking.name} completed (done) - inventory updated")
+                
+        except Exception as e:
+            _logger.error(f"Error completing delivery {picking.name}: {e}")
+
+    def test_cartona_state_transitions(self, order_id, test_statuses=None):
+        """
+        Test method to demonstrate and verify Cartona state transitions.
+        
+        This is useful for:
+        - Testing the state transition logic
+        - Debugging order processing issues
+        - Demonstrating the workflow to users
+        
+        Args:
+            order_id (str): Cartona order ID to test
+            test_statuses (list): List of statuses to test (optional)
+            
+        Returns:
+            dict: Test results with before/after states
+        """
+        
+        if test_statuses is None:
+            # Default test sequence covers the main workflow
+            test_statuses = ['approved', 'assigned_to_salesman', 'delivered', 'cancelled']
+        
+        order = self.env['sale.order'].search([('cartona_id', '=', order_id)], limit=1)
+        if not order:
+            return {'error': f'Order with cartona_id {order_id} not found'}
+        
+        results = []
+        for status in test_statuses:
+            try:
+                # Capture initial states
+                initial_state = order.state
+                initial_delivery_states = [p.state for p in order.picking_ids]
+                
+                _logger.info(f"Testing transition to '{status}' for order {order.name}")
+                self._apply_cartona_state_action(order, status)
+                
+                # Capture final states
+                final_state = order.state
+                final_delivery_states = [p.state for p in order.picking_ids]
+                
+                results.append({
+                    'status': status,
+                    'success': True,
+                    'initial_order_state': initial_state,
+                    'final_order_state': final_state,
+                    'initial_delivery_states': initial_delivery_states,
+                    'final_delivery_states': final_delivery_states
+                })
+                
+            except Exception as e:
+                results.append({
+                    'status': status,
+                    'success': False,
+                    'error': str(e)
+                })
+        
+        return {
+            'order_name': order.name,
+            'cartona_id': order_id,
+            'test_results': results
+        }
+
+    def _update_existing_order(self, order, order_data, config):
+        """
+        Update existing order with new marketplace data and handle state changes.
+        
+        This method:
+        1. Updates marketplace-specific fields
+        2. Checks if the Cartona status changed
+        3. Applies proper state transitions if status changed
+        
+        Args:
+            order (sale.order): Existing order to update
+            order_data (dict): New order data from Cartona
+            config (marketplace.config): Marketplace configuration
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        
+        try:
+            marketplace_status = order_data.get('status', 'pending')
+            current_status = order.marketplace_status
+            
+            # Update marketplace-specific information
             update_vals = {
                 'marketplace_status': marketplace_status,
                 'marketplace_sync_date': fields.Datetime.now(),
                 'marketplace_sync_status': 'synced',
-                'state': odoo_state,  # Update Odoo state based on marketplace status
             }
             
             # Update notes if provided
             if order_data.get('notes'):
                 update_vals['marketplace_notes'] = order_data['notes']
                 
+            # Update without triggering marketplace sync (avoid loops)
             order.with_context(skip_marketplace_sync=True).write(update_vals)
             
-            _logger.info(f"Updated existing order {order.name} - Status: {marketplace_status} -> {odoo_state}")
+            # Apply state transition only if status actually changed
+            # This prevents unnecessary processing and ensures idempotency
+            if current_status != marketplace_status:
+                _logger.info(f"Status changed for order {order.name}: {current_status} -> {marketplace_status}")
+                self._apply_cartona_state_action(order, marketplace_status)
+            
+            _logger.info(f"Updated existing order {order.name} - Status: {marketplace_status}")
             return True
             
         except Exception as e:

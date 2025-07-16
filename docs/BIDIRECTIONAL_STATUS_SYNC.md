@@ -119,7 +119,7 @@ ODOO_TO_CARTONA_MAPPING = {
     
     ('sale', 'confirmed'): 'approved',
     ('sale', 'assigned'): 'approved',
-    ('sale', 'done'): 'assigned_to_salesman',
+    ('sale', 'done'): 'assigned_to_salesman',  # Triggered by delivery validation
     
     ('done', 'done'): 'delivered',
     
@@ -144,6 +144,43 @@ ODOO_TO_CARTONA_MAPPING = {
 3. Apply mapping to update both order and delivery states
 4. Handle special cases (returns, cancellations)
 5. Log sync activity with enhanced traceability
+
+### 2. Delivery Validation Sync (Odoo → Cartona)
+
+**New Feature: Automatic Delivery Validation Sync**
+
+When a user clicks "Validate" on a delivery in Odoo and the delivery status becomes "done", the system automatically updates the order status in Cartona to "assigned_to_salesman".
+
+**Implementation Details:**
+- **Trigger**: `StockPicking.button_validate()` method override
+- **Condition**: Only for outgoing deliveries that become 'done' and are linked to Cartona orders
+- **Business Rule**: Only syncs for orders with `delivered_by='delivered_by_supplier'`
+- **Target Status**: Updates Cartona order status to 'assigned_to_salesman'
+- **Async Processing**: Uses background jobs to prevent blocking the UI
+
+**Code Flow:**
+```python
+# In StockPicking.button_validate()
+1. Call original button_validate() method
+2. Check if delivery became 'done' and is linked to Cartona order
+3. Verify business rules (delivered_by_supplier)
+4. Queue background job to sync status
+5. Call sale_order._sync_delivery_validation_to_cartona()
+6. Update Cartona via API with 'assigned_to_salesman' status
+7. Log sync results
+```
+
+**Business Rules:**
+- Only applies to outgoing deliveries (shipments)
+- Only for orders with `delivered_by='delivered_by_supplier'`
+- Skips sync if `skip_marketplace_sync` context is set
+- Requires both `cartona_id` and `marketplace_config_id` on the order
+
+**Error Handling:**
+- Comprehensive logging for debugging
+- Sync status tracking on the order
+- Error messages stored for troubleshooting
+- Marketplace sync log entries for audit trail
 
 **Code Structure (Odoo 18):**
 ```python
@@ -212,7 +249,7 @@ class MarketplaceOrderProcessor(models.Model):
         # Handle special cases with enhanced logic
         if cartona_status == 'returned':
             self._create_return_delivery(order)
-        elif cartona_status in ['cancelled_by_retailer', 'cancelled_by_supplier']:
+                    elif cartona_status in ['cancelled_by_retailer', 'cancelled_by_supplier']:
             self._handle_order_cancellation(order, cartona_status)
 
     def _create_return_delivery(self, order):
@@ -229,7 +266,7 @@ class MarketplaceOrderProcessor(models.Model):
             return_picking.create_returns()
 ```
 
-### 2. API Sync (Odoo → Cartona)
+### 3. API Sync (Odoo → Cartona)
 
 **Trigger:** Order or delivery state changes in Odoo
 
@@ -364,7 +401,7 @@ class SaleOrder(models.Model):
             return False
 ```
 
-### 3. Enhanced Conflict Resolution (Odoo 18)
+### 4. Enhanced Conflict Resolution (Odoo 18)
 
 **Advanced Features:**
 - Intelligent state validation

@@ -68,7 +68,18 @@ class SaleOrder(models.Model):
 
 
     def write(self, vals):
-        """Override write to sync status changes to marketplace"""
+        """
+        Override write to sync status changes to marketplace.
+        
+        This method automatically triggers marketplace sync when order status changes,
+        ensuring Odoo state changes are reflected in Cartona marketplace.
+        
+        Args:
+            vals (dict): Values being written to the order
+            
+        Returns:
+            bool: Result of parent write method
+        """
         result = super().write(vals)
         
         # Check if order status changed and needs marketplace sync
@@ -83,7 +94,16 @@ class SaleOrder(models.Model):
         return result
 
     def _filter_orders_for_sync(self):
-        """Filter orders based on business rules for syncing"""
+        """
+        Filter orders based on business rules for syncing.
+        
+        Business Rules:
+        - Orders delivered by Cartona: Only sync cancellation status
+        - Orders delivered by Supplier: Sync all status changes
+        
+        Returns:
+            sale.order: Filtered recordset of orders allowed to sync
+        """
         allowed_orders = self.env['sale.order']
         
         for order in self:
@@ -106,7 +126,12 @@ class SaleOrder(models.Model):
         return allowed_orders
 
     def _trigger_status_sync(self):
-        """Trigger order status sync to marketplace"""
+        """
+        Trigger order status sync to marketplace using queue jobs.
+        
+        This method queues async jobs to sync order status changes back to Cartona,
+        ensuring the marketplace is kept up-to-date with Odoo changes.
+        """
         for order in self:
             if order.cartona_id and order.marketplace_config_id:
                 # Queue job for async status sync
@@ -116,7 +141,14 @@ class SaleOrder(models.Model):
                 )._sync_status_to_marketplace()
 
     def _sync_status_to_marketplace(self):
-        """Sync order status to marketplace"""
+        """
+        Sync order status to marketplace via API.
+        
+        This method:
+        1. Maps Odoo status to marketplace status
+        2. Calls marketplace API to update status
+        3. Updates sync status and error handling
+        """
         self.ensure_one()
         
         if not self.cartona_id or not self.marketplace_config_id:
@@ -193,7 +225,18 @@ class SaleOrder(models.Model):
             _logger.error(f"Error syncing order {self.name} status: {e}")
 
     def _map_odoo_status_to_marketplace(self):
-        """Map Odoo order status to Cartona marketplace status"""
+        """
+        Map Odoo order status to Cartona marketplace status.
+        
+        Status Mapping:
+        - draft/sent → pending (order created, pending approval)
+        - sale → approved (sales order confirmed)
+        - done → delivered (order completed/delivered)
+        - cancel → cancelled_by_supplier (order cancelled)
+        
+        Returns:
+            str: Mapped marketplace status or None
+        """
         # Enhanced mapping based on Cartona API documentation
         status_mapping = {
             'draft': 'pending',           # Order created, pending approval
@@ -206,7 +249,15 @@ class SaleOrder(models.Model):
         return status_mapping.get(self.state)
 
     def _get_delivery_state(self):
-        """Get the primary delivery state for enhanced status mapping"""
+        """
+        Get the primary delivery state for enhanced status mapping.
+        
+        This method analyzes all outgoing deliveries and returns the most
+        advanced state based on priority: done > assigned > confirmed > waiting > draft
+        
+        Returns:
+            str: Primary delivery state
+        """
         # Get outgoing deliveries (shipments)
         outgoing_pickings = self.picking_ids.filtered(
             lambda p: p.picking_type_code == 'outgoing' and p.state != 'cancel'
@@ -224,7 +275,16 @@ class SaleOrder(models.Model):
         return 'draft'
 
     def _map_combined_status_to_marketplace(self):
-        """Enhanced mapping considering both order and delivery states"""
+        """
+        Enhanced mapping considering both order and delivery states.
+        
+        This provides more granular status mapping by considering:
+        - Order state (draft, sale, done, cancel)
+        - Delivery state (draft, confirmed, assigned, done)
+        
+        Returns:
+            str: Enhanced marketplace status
+        """
         order_state = self.state
         delivery_state = self._get_delivery_state()
         
@@ -457,6 +517,170 @@ Business Rules:
             'phone': delivery_partner.phone,
             'email': delivery_partner.email,
         }
+
+    def action_fill_move_quantity_with_demand(self):
+        """
+        Fill move quantities with demand for all deliveries.
+        
+        This is a utility method that automatically sets quantity_done = product_uom_qty
+        for all assigned move lines in outgoing deliveries. Useful for bulk processing
+        when you want to fulfill the entire demand.
+        
+        Returns:
+            dict: Action result with notification
+        """
+        self.ensure_one()
+        
+        filled_moves = 0
+        # Process all outgoing deliveries
+        for picking in self.picking_ids.filtered(lambda p: p.picking_type_code == 'outgoing'):
+            if picking.state == 'assigned':
+                # Fill quantities for all moves in this delivery
+                for move in picking.move_ids:
+                    if move.state == 'assigned' and move.quantity_done < move.product_uom_qty:
+                        move.quantity_done = move.product_uom_qty
+                        filled_moves += 1
+        
+        # Return appropriate notification
+        if filled_moves > 0:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("Quantities Filled"),
+                    'message': _("Filled %d move lines with demand quantities") % filled_moves,
+                    'type': 'success',
+                }
+            }
+        else:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("No Changes"),
+                    'message': _("No move lines needed quantity adjustment"),
+                    'type': 'info',
+                }
+            }
+
+    def _sync_delivery_validation_to_cartona(self):
+        """
+        Sync delivery validation to Cartona when delivery status becomes 'done'.
+        
+        This method is called when a delivery is validated and becomes 'done'.
+        It updates the order status in Cartona to 'assigned_to_salesman' to indicate
+        that the order has been shipped/delivered.
+        """
+        self.ensure_one()
+        
+        if not self.cartona_id or not self.marketplace_config_id:
+            _logger.warning(f"Cannot sync delivery validation for order {self.name}: missing cartona_id or marketplace_config_id")
+            return
+        
+        # Check business rules - only sync if delivered by supplier
+        if self.delivered_by != 'delivered_by_supplier':
+            _logger.info(f"Skipping delivery validation sync for order {self.name}: delivered_by_cartona orders don't sync delivery status")
+            return
+        
+        try:
+            # Update sync status to 'syncing'
+            self.write({
+                'marketplace_sync_status': 'syncing',
+            })
+            
+            # Get API client for this marketplace
+            api_client = self.env['marketplace.api'].with_context(
+                marketplace_config_id=self.marketplace_config_id.id
+            )
+            
+            # Use 'assigned_to_salesman' status for delivery validation
+            # This indicates the order has been shipped/delivered by the supplier
+            marketplace_status = 'assigned_to_salesman'
+            
+            _logger.info(f"Syncing delivery validation for order {self.name} to Cartona with status: {marketplace_status}")
+            
+            # Sync status to marketplace using single order endpoint
+            result = api_client.update_single_order_status(self, marketplace_status)
+            
+            # Ensure result is a dictionary (extra safety check)
+            if not isinstance(result, dict):
+                error_msg = f"API returned unexpected response type: {type(result)}. Response: {result}"
+                self.write({
+                    'marketplace_sync_status': 'error',
+                    'marketplace_error_message': error_msg
+                })
+                _logger.error(f"Unexpected API response for delivery validation sync of order {self.name}: {error_msg}")
+                return
+            
+            if result.get('success'):
+                # Update order with successful sync
+                self.write({
+                    'marketplace_sync_status': 'synced',
+                    'marketplace_status': marketplace_status,
+                    'marketplace_sync_date': fields.Datetime.now(),
+                    'marketplace_error_message': False
+                })
+                
+                _logger.info(f"Successfully synced delivery validation for order {self.name} to Cartona")
+                
+                # Log successful sync
+                self.env['marketplace.sync.log'].log_operation(
+                    marketplace_config_id=self.marketplace_config_id.id,
+                    operation_type='status_sync',
+                    status='success',
+                    message=f"Successfully synced delivery validation for order: {self.name}",
+                    record_model='sale.order',
+                    record_id=self.id,
+                    record_name=self.name,
+                    records_processed=1,
+                    records_success=1
+                )
+            else:
+                # Handle API error
+                error_msg = result.get('error', 'Unknown API error')
+                self.write({
+                    'marketplace_sync_status': 'error',
+                    'marketplace_error_message': error_msg
+                })
+                
+                _logger.error(f"Failed to sync delivery validation for order {self.name} to Cartona: {error_msg}")
+                
+                # Log failed sync
+                self.env['marketplace.sync.log'].log_operation(
+                    marketplace_config_id=self.marketplace_config_id.id,
+                    operation_type='status_sync',
+                    status='error',
+                    message=f"Failed to sync delivery validation for order: {self.name}",
+                    record_model='sale.order',
+                    record_id=self.id,
+                    record_name=self.name,
+                    records_processed=1,
+                    records_error=1,
+                    error_details=error_msg
+                )
+                
+        except Exception as e:
+            error_msg = f"Exception during delivery validation sync: {str(e)}"
+            self.write({
+                'marketplace_sync_status': 'error',
+                'marketplace_error_message': error_msg
+            })
+            
+            _logger.error(f"Exception during delivery validation sync for order {self.name}: {e}")
+            
+            # Log exception
+            self.env['marketplace.sync.log'].log_operation(
+                marketplace_config_id=self.marketplace_config_id.id,
+                operation_type='status_sync',
+                status='error',
+                message=f"Exception during delivery validation sync for order: {self.name}",
+                record_model='sale.order',
+                record_id=self.id,
+                record_name=self.name,
+                records_processed=1,
+                records_error=1,
+                error_details=error_msg
+            )
 
 
 class SaleOrderLine(models.Model):
