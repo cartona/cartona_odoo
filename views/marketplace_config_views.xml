@@ -492,15 +492,20 @@ if not config:
         'active': True,
     })
 
+# Dynamically determine the module name for the view reference
+model = env['ir.model'].search([('model', '=', 'marketplace.config')], limit=1)
+module_name = model.modules and model.modules.split(',')[0] or 'cartona_odoo'
+view_id = env.ref(f'{module_name}.view_marketplace_config_form').id
+
 # Return action to open the configuration
 action = {
     'type': 'ir.actions.act_window',
-    'name': 'Cartona Configuration',
+    'name': config.name or 'Marketplace Configuration',
     'res_model': 'marketplace.config',
     'res_id': config.id,
     'view_mode': 'form',
     'target': 'current',
-    'view_id': env.ref('cartona_integration.view_marketplace_config_form').id,
+    'view_id': view_id,
     'context': {'form_view_initial_mode': 'edit'},
 }
             </field>
