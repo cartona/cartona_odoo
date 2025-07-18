@@ -39,7 +39,7 @@
                             </button>
                             <button name="manual_sync_products" type="object" class="btn btn-outline-light" 
                                     style="border-radius: 16px; padding: 12px 24px; font-weight: 700; font-size: 14px; border: 2px solid rgba(255,255,255,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(10px);">
-                                <i class="fa fa-sync" style="margin-right: 8px;"></i>Sync Products
+                                <i class="fa fa-refresh" style="margin-right: 8px;"></i>Sync Products
                             </button>
                             <button name="manual_pull_products" type="object" class="btn btn-success" 
                                     style="border-radius: 16px; padding: 12px 24px; font-weight: 700; font-size: 14px; box-shadow: 0 8px 32px rgba(40,167,69,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: linear-gradient(135deg, #28a745, #20c997);">

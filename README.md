@@ -1,210 +1,131 @@
 # Cartona Marketplace Integration
 
-> **Note:** This module is designed for Odoo 18.
+> **Compatible with Odoo 18.0**
 
-Universal marketplace integration module for Odoo suppliers to connect with Cartona, Amazon, eBay, Shopify, and other marketplaces.
+## Purpose
 
-## Overview
+This module integrates the Cartona B2B marketplace with Odoo Sales and Inventory modules, enabling suppliers to automatically sync products, manage inventory, and process orders seamlessly between their Odoo system and multiple marketplace platforms.
 
-This module enables suppliers to:
-- Connect their Odoo system to multiple marketplace platforms
-- Sync products, prices, and stock in real-time
-- Pull orders automatically from marketplaces  
-- Manage customer data from marketplace orders
-- Monitor synchronization status and errors
+## Core Features
 
-## Key Features
+### 🔗 **Multi-Marketplace Integration**
+- **Universal Support**: Connect to Cartona, Amazon, eBay, Shopify, and other REST API marketplaces
+- **Bearer Token Authentication**: Standardized authentication across platforms
+- **Single Configuration**: Manage multiple marketplaces from one interface
 
-### 🔗 Universal Integration
-- **Multi-Marketplace Support**: Cartona, Amazon, eBay, Shopify, and more
-- **Generic API Client**: Works with any REST API marketplace
-- **Bearer Token Authentication**: Standardized authentication method
-- **Flexible Configuration**: Each marketplace has independent settings
+### 📦 **Product & Inventory Management**
+- **Real-time Sync**: Automatic price and stock updates (<5 seconds)
+- **Universal Product ID**: Single `cartona_id` field for all marketplace integrations
+- **Multi-warehouse Support**: Sync inventory across multiple locations
+- **Bulk Operations**: Efficient batch processing for large catalogs
 
-### 📦 Product Management
-- **Universal External ID**: Single `cartona_id` field for all marketplaces
-- **Real-time Price Sync**: Automatic price updates (<5 seconds)
-- **Stock Synchronization**: Multi-warehouse inventory sync
-- **Product Matching**: Reliable product identification across platforms
+### 📋 **Order Processing**
+- **Automatic Order Pull**: Import orders from marketplaces every 15 minutes
+- **Customer Auto-creation**: Automatically create customer records from marketplace orders
+- **Bidirectional Status Sync**: Order status updates flow between Odoo and marketplaces
+- **Complete Order Details**: Preserve all order information and line items
 
-### 📋 Order Management
-- **Customer Creation**: Auto-create customers from marketplace orders
-- **Status Synchronization**: Bidirectional order status updates
-- **Order Line Details**: Complete order information preservation
+### 🎛️ **Seamless User Experience**
+- **Extend Existing Views**: No duplicate interfaces - work within familiar Odoo screens
+- **Minimal New Views**: Only 2 new screens (Configuration + Monitoring Dashboard)
+- **Queue-based Processing**: Reliable background processing with error handling
+- **Comprehensive Logging**: Monitor all operations with detailed sync logs
 
-### 🎛️ Minimal UI Approach
-- **Extend Existing Views**: No duplicate product/order management
-- **Familiar Interface**: Users work in standard Odoo screens
-- **Only 2 New Views**: Configuration and monitoring dashboard
-- **Seamless Integration**: Marketplace features blend naturally
+## Supported Odoo Version
+
+- **Odoo 18.0** (Primary)
+- Designed for future compatibility with Odoo 15.0+, 16.0+, 17.0+
+
+## Dependencies
+
+### Required Modules
+- `base` - Core Odoo functionality
+- `sale_management` - Sales order processing
+- `stock` - Inventory management
+- `product` - Product catalog
+- `purchase` - Purchase operations
+- `queue_job` - Asynchronous background processing
+
+### External Dependencies
+- **Python Libraries**: `requests` (for API communication)
+
+## Installation Steps
+
+1. **Prerequisites Check**:
+   ```bash
+   # Ensure queue_job module is installed
+   # Verify Python requests library is available
+   pip install requests
+   ```
+
+2. **Install Module**:
+   ```bash
+   # Copy module to your Odoo addons directory
+   cp -r cartona_integration /path/to/odoo/addons/
+   
+   # Restart Odoo service
+   sudo systemctl restart odoo
+   ```
+
+3. **Activate Module**:
+   - Go to **Apps** → **Update Apps List**
+   - Search for "**Cartona**"
+   - Click **Install**
+
+4. **Configure Integration**:
+   - Navigate to **Cartona** → **Configuration**
+   - Enter your marketplace API credentials
+   - Test connection and enable auto-sync options
+
+## Basic Usage
+
+### Quick Start
+1. **Setup Marketplace Connection**:
+   - Go to **Cartona** → **Configuration**
+   - Enter API Base URL and Authentication Token
+   - Click **Test Connection** to verify
+
+2. **Configure Products**:
+   - Open any product in **Sales** → **Products**
+   - Set **External Product ID** (cartona_id)
+   - Enable **Marketplace Sync**
+
+3. **Monitor Operations**:
+   - Check **Cartona** → **Monitoring** for sync status
+   - Review logs for any errors or warnings
+   - View statistics on synced products and pulled orders
+
+### Automated Operations
+- **Product Sync**: Price and stock changes sync automatically within 5 seconds
+- **Order Import**: New orders pulled every 15 minutes
+- **Status Updates**: Order status changes sync bidirectionally
+- **Customer Creation**: New customers created automatically from orders
 
 ## Architecture
 
 ### Integration Model
 - **One Odoo Instance = One Supplier**
 - **Direct Connection**: Supplier's Odoo ↔ Marketplace Platform
-- **Independent Operation**: Each supplier manages their own integration
+- **Universal Field Strategy**: Single `cartona_id` field works across all marketplaces
 
-### Field Strategy
-- **Products**: `cartona_id` field stores external product ID
-- **Partners**: `cartona_id` field with `retailer_` prefix for customers
-- **Orders**: `cartona_id` field for external order matching
+### Processing Flow
+1. **Products**: Changes trigger real-time API calls to update marketplace
+2. **Orders**: Background jobs pull orders and create Odoo sales orders
+3. **Customers**: Auto-created with `retailer_` prefix in cartona_id field
+4. **Status Sync**: Bidirectional updates maintain consistency
 
-## Installation
+## Contact / Maintainer Info
 
-1. **Prerequisites**: 
-   - Odoo 15.0+, 16.0+, or 17.0+
-   - `queue_job` module installed
-   - Python `requests` library
+- **Author**: Cartona Integration Team
+- **Website**: [https://cartona.com](https://cartona.com)
+- **License**: LGPL-3
+- **Version**: 18.0.1.0.0
 
-2. **Install Module**:
-   ```bash
-   # Copy module to addons directory
-   cp -r cartona_integration /path/to/odoo/addons/
-   
-   # Update app list and install
-   # Go to Apps > Update Apps List > Search "Cartona" > Install
-   ```
-
-3. **Configure Marketplace**:
-   - Navigate to Marketplace Integration > Configuration > Marketplaces
-   - Create new marketplace configuration
-   - Enter API credentials and test connection
-
-## Configuration
-
-### Basic Setup
-1. **Marketplace Configuration**:
-   - Name: Display name (e.g., "Cartona", "Amazon")
-   - API Base URL: Marketplace API endpoint
-   - Auth Token: Bearer token from marketplace
-   - Enable auto-sync options as needed
-
-2. **Product Setup**:
-   - Set `External Product ID` on products you want to sync
-   - Enable marketplace sync on products
-   - Products sync automatically on price/stock changes
-
-3. **Order Processing**:
-   - Orders import automatically every 15 minutes
-   - Customer records created automatically
-
-## Usage
-
-### Product Synchronization
-1. **Set External Product ID**: Add `cartona_id` to products you want to sync
-2. **Enable Sync**: Check "Enable Marketplace Sync" on product
-3. **Automatic Sync**: Price and stock changes sync automatically
-4. **Manual Sync**: Use "Manual Sync" button when needed
-
-### Order Management
-1. **Customer Creation**: Customers created automatically from order data
-2. **Status Updates**: Order statuses sync bidirectionally
-3. **Order Processing**: Use standard Odoo sales order workflow
-
-### Monitoring
-1. **Dashboard**: View sync status for all marketplaces
-2. **Sync Logs**: Monitor operations and troubleshoot errors
-3. **Connection Testing**: Test API connections anytime
-4. **Statistics**: Track products synced and orders pulled
-
-## API Integration
-
-### Supported Marketplaces
-
-#### Cartona
-- **Base URL**: `https://supplier-integrations.cartona.com/api/v1/`
-- **Auth Header**: `AuthorizationToken`
-- **Token Format**: Bearer token
-
-#### Amazon (Example)
-- **Base URL**: `https://sellingpartnerapi.amazon.com/v1/`
-- **Auth Header**: `Authorization`
-- **Token Format**: Bearer token
-
-#### Generic REST API
-- Any marketplace with REST API and bearer token authentication
-- Configurable endpoints and headers
-- Standard HTTP methods (GET, POST, PUT, DELETE)
-
-### Key Endpoints
-- `GET /supplier-product` - List products
-- `POST /supplier-product/bulk-update` - Update products
-- `POST /supplier-product/bulk-update-stock` - Update stock
-- `GET /order/pull-orders` - Pull orders
-- `POST /order/update-order-status` - Update order status
-
-## Troubleshooting
-
-### Connection Issues
-1. **Verify API URL**: Ensure base URL is correct and accessible
-2. **Check Token**: Verify authentication token is valid
-3. **Test Connection**: Use "Test Connection" button in configuration
-4. **Review Logs**: Check sync logs for detailed error messages
-
-### Sync Problems
-1. **Missing External IDs**: Ensure products have `cartona_id` set
-2. **Disabled Sync**: Check "Enable Marketplace Sync" is enabled
-3. **Queue Jobs**: Verify queue job worker is running
-4. **API Limits**: Check if API rate limits are being hit
-
-### Common Errors
-- **"Missing external ID"**: Set `cartona_id` on products/partners
-- **"Connection timeout"**: Increase timeout setting or check network
-- **"Invalid token"**: Verify authentication token with marketplace
-- **"Product not found"**: Ensure product exists in marketplace catalog
-
-## Development
-
-### Module Structure
-```
-cartona_integration/
-├── models/           # Data models and business logic
-├── views/            # UI extensions and new views
-├── controllers/      # Webhook endpoints
-├── security/         # Access rights and security
-├── data/             # Default data and configurations
-└── demo/             # Demo data for testing
-```
-
-### Key Models
-- `marketplace.config`: Marketplace configurations
-- `marketplace.api`: Generic API client
-- `marketplace.order.processor`: Order processing logic
-- `marketplace.sync.log`: Operation logging
-
-### Extending the Module
-1. **New Marketplace**: Add configuration in `marketplace.config`
-2. **Custom API**: Override methods in `marketplace.api`
-3. **Data Mapping**: Customize `_prepare_product_data()` methods
-4. **UI Extensions**: Add fields to existing view extensions
-
-## Support
-
-### Documentation
-- Technical docs: `/path/to/module/docs/`
-- API reference: Check sync logs for request/response examples
-- Configuration guide: Built-in help text in forms
-
-### Getting Help
-1. **Check Logs**: Review marketplace sync logs first
-2. **Test Connection**: Verify API connectivity
-3. **Configuration**: Double-check marketplace settings
-4. **Odoo Logs**: Check Odoo server logs for detailed errors
-
-## License
-
-This module is licensed under LGPL-3.
-
-## Version History
-
-- **v17.0.1.0.0**: Initial release with universal marketplace support
-  - Multi-marketplace configuration
-  - Real-time sync capabilities  
-  - Webhook-based order pull
-  - Minimal UI architecture
-  - Queue-based processing
+### Support
+- **Documentation**: Check module views for built-in help text
+- **Logs**: Review **Cartona** → **Monitoring** for troubleshooting
+- **Configuration**: Use **Test Connection** feature to verify setup
 
 ---
 
-**Ready for Production**: This module is designed for immediate deployment with comprehensive error handling, logging, and monitoring capabilities.
+**Ready for Production**: This module includes comprehensive error handling, logging, and monitoring capabilities for immediate deployment in production environments.
