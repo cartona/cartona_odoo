@@ -65,9 +65,6 @@ Architecture:
         # Menu
         'views/marketplace_menu.xml',
     ],
-    'demo': [   
-        'demo/marketplace_demo.xml',
-    ],
     'images': ['static/description/icon.png'],
     'qweb': [],
     'installable': True,
