@@ -9,7 +9,6 @@
             <field name="arch" type="xml">
                 <kanban class="o_kanban_dashboard" create="false" edit="false">
                     <field name="name" />
-                    <field name="active" />
                     <field name="connection_status" />
                     <field name="last_sync_date" />
                     <field name="total_products_synced" />
@@ -217,7 +216,6 @@
                     <field name="operation_type" />
                     <field name="record_name" />
                     <field name="message" />
-
                     <filter string="Success" name="success" domain="[('status', '=', 'success')]" />
                     <filter string="Errors" name="errors" domain="[('status', '=', 'error')]" />
                     <filter string="Warnings" name="warnings" domain="[('status', '=', 'warning')]" />

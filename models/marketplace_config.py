@@ -11,12 +11,13 @@ class MarketplaceConfig(models.Model):
     _description = 'Marketplace Integration Configuration'
     _rec_name = 'name'
     _order = 'sequence, name'
+    _archivable = False  # Disable archive action in Odoo 18
 
     # Basic Configuration
     name = fields.Char(string="Marketplace Name", required=True, default="Cartona Marketplace",
                       help="Display name for this marketplace (e.g., 'Cartona', 'Amazon', 'eBay')")
     sequence = fields.Integer(string="Sequence", default=10)
-    active = fields.Boolean(string="Active", default=True)
+    # Removed active field to fully disable Archive action
     
     # API Configuration
     api_base_url = fields.Char(string="API Base URL", required=True,

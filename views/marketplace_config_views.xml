@@ -6,317 +6,210 @@
             <field name="name">marketplace.config.form</field>
             <field name="model">marketplace.config</field>
             <field name="arch" type="xml">
-                <form string="Cartona Marketplace Configuration" style="width: 100%; display: flex; justify-content: center; align-items: flex-start; background: #f5f7fa; min-height: 100vh; padding: 40px 20px; box-sizing: border-box;">
+                <form string="Cartona Marketplace Configuration" delete="false" duplicate="false" create="false" style="width: 100%; display: flex; justify-content: center; align-items: flex-start; background: #f5f7fa; min-height: 100vh; padding: 40px 20px; box-sizing: border-box;">
+                    <!-- Add custom action buttons to the Action dropdown menu -->
                     <div style="max-width: 1400px; width: 100%;">
                         <!-- Premium Header with Glassmorphism -->
-                        <header style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 24px 24px 0 0; margin-bottom: 24px; position: relative; overflow: hidden;">
-                        <!-- Animated Background Elements -->
-                        <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 30px 30px; animation: float 20s ease-in-out infinite;"></div>
-                        <div style="position: absolute; top: 20px; right: 20px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.1), transparent 70%); border-radius: 50%; animation: pulse 4s ease-in-out infinite;"></div>
-                        <div style="position: absolute; bottom: -30px; left: -30px; width: 100px; height: 100px; background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%); border-radius: 50%; animation: pulse 6s ease-in-out infinite;"></div>
+                        <header style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; min-height: 160px; border-radius: 24px 24px 0 0; margin-bottom: 24px; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; padding-left: 40px;">
+                            <!-- Remove animation from background elements -->
+                            <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 30px 30px;"></div>
+                            <div style="position: absolute; top: 20px; right: 20px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.1), transparent 70%); border-radius: 50%;"></div>
+                            <div style="position: absolute; bottom: -30px; left: -30px; width: 100px; height: 100px; background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%); border-radius: 50%;"></div>
 
-                        <!-- Header Content -->
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; position: relative; z-index: 1;">
-                            <div style="display: flex; align-items: center;">
-                                <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 20px; margin-right: 20px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-                                    <i class="fa fa-shopping-cart" style="font-size: 40px; color: #fff; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));" title="Cartona Integration"></i>
-                                </div>
-                                <div>
-                                    <h1 style="margin: 0; font-size: 32px; font-weight: 800; color: #fff; text-shadow: 0 4px 8px rgba(0,0,0,0.3); letter-spacing: -0.5px;">Cartona Integration</h1>
-                                    <p style="margin: 6px 0 0 0; font-size: 16px; color: rgba(255,255,255,0.9); font-weight: 500;">Advanced marketplace synchronization platform</p>
+                            <!-- Header Content -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; position: relative; z-index: 1;">
+                                <div style="display: flex; align-items: center;">
+                                    <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 20px; margin-right: 20px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+                                        <i class="fa fa-shopping-cart" style="font-size: 40px; color: #fff; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));" title="Cartona Integration"></i>
+                                    </div>
+                                    <div>
+                                        <h1 style="margin: 0; font-size: 32px; font-weight: 800; color: #fff; text-shadow: 0 4px 8px rgba(0,0,0,0.3); letter-spacing: -0.5px;">Cartona Integration</h1>
+                                        <p style="margin: 6px 0 0 0; font-size: 16px; color: rgba(255,255,255,0.9); font-weight: 500;">Advanced marketplace synchronization platform</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 16px; backdrop-filter: blur(10px);">
-                                <field name="active" widget="boolean_toggle" style="transform: scale(1.5);"/>
-                            </div>
-                        </div>
 
-                        <!-- Quick Action Buttons -->
-                        <div style="display: flex; gap: 16px; flex-wrap: wrap; position: relative; z-index: 1;">
-                            <button name="test_connection" type="object" class="btn btn-light" 
-                                    style="border-radius: 16px; padding: 12px 24px; font-weight: 700; font-size: 14px; box-shadow: 0 8px 32px rgba(255,255,255,0.2); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(10px);">
-                                <i class="fa fa-wifi" style="margin-right: 8px;"></i>Test Connection
-                            </button>
-                            <button name="manual_sync_products" type="object" class="btn btn-outline-light" 
-                                    style="border-radius: 16px; padding: 12px 24px; font-weight: 700; font-size: 14px; border: 2px solid rgba(255,255,255,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(10px);">
-                                <i class="fa fa-refresh" style="margin-right: 8px;"></i>Sync Products
-                            </button>
-                            <button name="manual_pull_products" type="object" class="btn btn-success" 
-                                    style="border-radius: 16px; padding: 12px 24px; font-weight: 700; font-size: 14px; box-shadow: 0 8px 32px rgba(40,167,69,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: linear-gradient(135deg, #28a745, #20c997);">
-                                <i class="fa fa-download" style="margin-right: 8px;"></i>Pull Products
-                            </button>
-                            <button name="manual_pull_orders" type="object" class="btn btn-warning" 
-                                    style="border-radius: 16px; padding: 12px 24px; font-weight: 700; font-size: 14px; box-shadow: 0 8px 32px rgba(255,193,7,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background: linear-gradient(135deg, #ffc107, #fd7e14);">
-                                <i class="fa fa-shopping-bag" style="margin-right: 8px;"></i>Pull Orders
-                            </button>
-                                                </div>
+                            <!-- Quick Action Buttons -->
                         </header>
 
                         <!-- Premium Sheet with Glassmorphism -->
                         <sheet style="background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%); border-radius: 0 0 24px 24px; margin-top: -24px; padding-top: 48px; position: relative;">
-                        <!-- Floating Decorative Elements -->
-                        <div style="position: absolute; top: 30px; right: 30px; width: 80px; height: 80px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1)); border-radius: 50%; animation: float 8s ease-in-out infinite;"></div>
-                        <div style="position: absolute; top: 120px; left: 40px; width: 60px; height: 60px; background: linear-gradient(135deg, rgba(40,167,69,0.1), rgba(32,201,151,0.1)); border-radius: 50%; animation: float 10s ease-in-out infinite reverse;"></div>
+                            <!-- Floating Decorative Elements -->
+                            <div style="position: absolute; top: 30px; right: 30px; width: 80px; height: 80px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1)); border-radius: 50%;"></div>
+                            <div style="position: absolute; top: 120px; left: 40px; width: 60px; height: 60px; background: linear-gradient(135deg, rgba(40,167,69,0.1), rgba(32,201,151,0.1)); border-radius: 50%;"></div>
 
-                        <!-- Status Dashboard -->
-                        <div class="oe_button_box" name="button_box">
-                            <!-- Connection Status Indicator -->
-                            <div class="oe_stat_button" invisible="connection_status != 'connected'"
-                                 style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-                                        border: none;
-                                        border-radius: 20px;
-                                        box-shadow: 0 8px 32px rgba(40,167,69,0.15);
-                                        margin: 0 8px;
-                                        padding-top: 23px; padding-bottom: 23px;
-                                        min-width: 160px;
-                                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                                        position: relative;
-                                        overflow: hidden;">
-                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 50%); pointer-events: none;"></div>
-                                <div class="o_field_widget o_stat_info" style="display: flex; align-items: center; width: 100%; justify-content: center; position: relative; z-index: 1;">
-                                    <span class="o_stat_value" style="display: inline-block; margin-right: 16px;">
-                                        <i class="fa fa-check-circle" 
-                                           style="font-size: 25px; color: #2e7d32; text-shadow: 0 4px 8px rgba(46,125,50,0.4); filter: drop-shadow(0 4px 8px rgba(46,125,50,0.3));" title="Connection Successful"></i>
-                                    </span>
-                                    <span class="o_stat_text" style="color: #2e7d32; font-weight: 800; font-size: 16px; display: inline-block; text-shadow: 0 2px 4px rgba(46,125,50,0.2);">Connected</span>
-                                </div>
-                            </div>
-
-                            <!-- Error Status Indicator -->
-                            <div class="oe_stat_button" invisible="connection_status != 'error'"
-                                 style="background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-                                        border: none;
-                                        border-radius: 20px;
-                                        box-shadow: 0 8px 32px rgba(198,40,40,0.15);
-                                        margin: 0 8px;
-                                        padding-top: 23px; padding-bottom: 23px;
-                                        min-width: 160px;">
-                                <div class="o_field_widget o_stat_info" style="display: flex; align-items: center; width: 100%; justify-content: center;">
-                                    <span class="o_stat_value" style="display: inline-block; margin-right: 12px;">
-                                        <i class="fa fa-exclamation-triangle" 
-                                           style="font-size: 25px; color: #c62828; text-shadow: 0 2px 4px rgba(198,40,40,0.3);" title="Connection Error"></i>
-                                    </span>
-                                    <span class="o_stat_text" style="color: #c62828; font-weight: 700; font-size: 14px; display: inline-block;">Error</span>
-                                </div>
-                            </div>
-
-                            <!-- Not Tested Status -->
-                            <div class="oe_stat_button" invisible="connection_status != 'not_tested'"
-                                 style="background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
-                                        border: none;
-                                        border-radius: 20px;
-                                        box-shadow: 0 8px 32px rgba(239,108,0,0.15);
-                                        margin: 0 8px;
-                                        padding-top: 23px; padding-bottom: 23px;
-                                        min-width: 160px;">
-                                <div class="o_field_widget o_stat_info" style="display: flex; align-items: center; width: 100%; justify-content: center;">
-                                    <span class="o_stat_value" style="display: inline-block; margin-right: 12px;">
-                                        <i class="fa fa-question-circle" 
-                                            style="font-size: 25px; color: #ef6c00; text-shadow: 0 2px 4px rgba(239,108,0,0.3);" title="Connection Not Tested"></i>
-                                    </span>
-                                    <span class="o_stat_text" style="color: #ef6c00; font-weight: 700; font-size: 14px; display: inline-block;">Not Tested</span>
-                                </div>
-                            </div>
-
-                            <!-- Auto Sync Status -->
-                            <div class="oe_stat_button" invisible="not auto_sync_stock and not auto_sync_prices and not auto_pull_orders"
-                                 style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-                                        border: none;
-                                        border-radius: 20px;
-                                        box-shadow: 0 8px 32px rgba(40,167,69,0.15);
-                                        margin: 0 8px;
-                                        padding-top: 23px; padding-bottom: 23px;
-                                        min-width: 160px;">
-                                <div class="o_field_widget o_stat_info" style="display: flex; align-items: center; width: 100%; justify-content: center;">
-                                    <span class="o_stat_value" style="display: inline-block; margin-right: 16px;">
-                                        <i class="fa fa-refresh" 
-                                           style="font-size: 25px; color: #2e7d32; text-shadow: 0 4px 8px rgba(46,125,50,0.4); filter: drop-shadow(0 4px 8px rgba(46,125,50,0.3)); animation: rotate 4s linear infinite;" title="Auto Sync Active"></i>
-                                    </span>
-                                    <span class="o_stat_text" style="color: #2e7d32; font-weight: 800; font-size: 16px; display: inline-block; text-shadow: 0 2px 4px rgba(46,125,50,0.2);">Auto Sync</span>
-                                </div>
-                            </div>
-
-                            <!-- Manual Sync Status -->
-                            <div class="oe_stat_button" invisible="auto_sync_stock or auto_sync_prices or auto_pull_orders"
-                                 style="background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
-                                        border: none;
-                                        border-radius: 20px;
-                                        box-shadow: 0 8px 32px rgba(97,97,97,0.15);
-                                        margin: 0 8px;
-                                        padding-top: 23px; padding-bottom: 23px;
-                                        min-width: 160px;">
-                                <div class="o_field_widget o_stat_info" style="display: flex; align-items: center; width: 100%; justify-content: center;">
-                                    <span class="o_stat_value" style="display: inline-block; margin-right: 12px;">
-                                        <i class="fa fa-hand-paper" 
-                                           style="font-size: 25px; color: #616161; text-shadow: 0 2px 4px rgba(97,97,97,0.3);" title="Manual Sync Mode"></i>
-                                    </span>
-                                    <span class="o_stat_text" style="color: #616161; font-weight: 700; font-size: 16px; display: inline-block;">Manual Sync</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Premium Configuration Cards -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 48px;">
-                            <!-- Marketplace Settings Card -->
-                            <div class="card-enhanced" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 24px; padding: 36px; box-shadow: 0 16px 64px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid rgba(102,126,234,0.1); position: relative; overflow: hidden;">
-                                <div style="position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 24px 24px 0 0;"></div>
-                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(102,126,234,0.02) 0%, transparent 50%); pointer-events: none;"></div>
-                                
-                                <h3 style="margin: 0 0 28px 0; color: #495057; font-weight: 800; display: flex; align-items: center; font-size: 20px;">
-                                    <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 12px; border-radius: 16px; margin-right: 16px; box-shadow: 0 8px 24px rgba(102,126,234,0.3);">
-                                        <i class="fa fa-cog" style="color: white; font-size: 18px;" title="Configuration Settings"></i>
+                            <!-- Status Dashboard -->
+                            <div class="oe_button_box" name="button_box">
+                                <!-- Manual Sync Status -->
+                                <div class="oe_stat_button" invisible="auto_sync_stock or auto_sync_prices or auto_pull_orders"
+                                     style="background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+                                            border: none;
+                                            border-radius: 20px;
+                                            box-shadow: 0 8px 32px rgba(97,97,97,0.15);
+                                            margin: 0 8px;
+                                            padding-top: 23px; padding-bottom: 23px;
+                                            min-width: 160px;">
+                                    <div class="o_field_widget o_stat_info" style="display: flex; align-items: center; width: 100%; justify-content: center;">
+                                        <span class="o_stat_value" style="display: inline-block; margin-right: 12px;">
+                                            <i class="fa fa-hand-paper" 
+                                               style="font-size: 25px; color: #616161; text-shadow: 0 2px 4px rgba(97,97,97,0.3);" title="Manual Sync Mode"></i>
+                                        </span>
+                                        <span class="o_stat_text" style="color: #616161; font-weight: 700; font-size: 16px; display: inline-block;">Manual Sync</span>
                                     </div>
-                                    Marketplace Settings
+                                </div>
+                            </div>
+
+                            <!-- Premium Configuration Cards -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 48px;">
+                                <!-- Marketplace Settings Card -->
+                                <div class="card-enhanced" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 24px; padding: 36px; box-shadow: 0 16px 64px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid rgba(102,126,234,0.1); position: relative; overflow: hidden;">
+                                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 24px 24px 0 0;"></div>
+                                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(102,126,234,0.02) 0%, transparent 50%); pointer-events: none;"></div>
+                                    
+                                    <h3 style="margin: 0 0 28px 0; color: #495057; font-weight: 800; display: flex; align-items: center; font-size: 20px;">
+                                        <div style="background: linear-gradient(135deg, #667eea, #764ba2); padding: 12px; border-radius: 16px; margin-right: 16px; box-shadow: 0 8px 24px rgba(102,126,234,0.3);">
+                                            <i class="fa fa-cog" style="color: white; font-size: 18px;" title="Configuration Settings"></i>
+                                        </div>
+                                        Marketplace Settings
+                                    </h3>
+                                    
+                                    <group>
+                                        <field name="name" readonly="1"
+                                               style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"
+                                               placeholder="Enter marketplace name"/>
+                                    </group>
+                                </div>
+
+                                <!-- API Configuration Card -->
+                                <div class="card-enhanced" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 24px; padding: 36px; box-shadow: 0 16px 64px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid rgba(255,193,7,0.1); position: relative; overflow: hidden;">
+                                    <div style="position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #ffc107, #fd7e14); border-radius: 24px 24px 0 0;"></div>
+                                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,193,7,0.02) 0%, transparent 50%); pointer-events: none;"></div>
+                                    
+                                    <h3 style="margin: 0 0 28px 0; color: #495057; font-weight: 800; display: flex; align-items: center; font-size: 20px;">
+                                        <div style="background: linear-gradient(135deg, #ffc107, #fd7e14); padding: 12px; border-radius: 16px; margin-right: 16px; box-shadow: 0 8px 24px rgba(255,193,7,0.3);">
+                                            <i class="fa fa-key" style="color: white; font-size: 18px;" title="API Settings"></i>
+                                        </div>
+                                        API Configuration
+                                    </h3>
+                                    
+                                    <group>
+                                        <field name="api_base_url" 
+                                               style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"/>
+                                        <field name="auth_token" password="True" 
+                                               style="padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"/>
+                                        <field name="auth_header" invisible="1"/>
+                                    </group>
+                                </div>
+                            </div>
+
+                            <!-- Sync Settings Section -->
+                            <div style="background: white; border-radius: 16px; padding: 32px; box-shadow: 0 8px 32px rgba(0,0,0,0.08); border: 1px solid #e9ecef; margin-bottom: 40px;">
+                                <h3 style="margin: 0 0 24px 0; color: #495057; font-weight: 700; display: flex; align-items: center;">
+                                    <i class="fa fa-sync-alt" style="margin-right: 12px; color: #6c757d;" title="Synchronization Settings"></i>
+                                    Synchronization Settings
                                 </h3>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;">
+                                    <div style="padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 4px solid #28a745;">
+                                        <field name="auto_sync_stock" widget="boolean_toggle"/>
+                                        <small style="color: #6c757d; display: block; margin-top: 6px;">Automatically sync stock levels</small>
+                                    </div>
+                                    <div style="padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 4px solid #ffc107;">
+                                        <field name="auto_sync_prices" widget="boolean_toggle"/>
+                                        <small style="color: #6c757d; display: block; margin-top: 6px;">Automatically sync price changes</small>
+                                    </div>
+                                    <div style="padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 4px solid #17a2b8;">
+                                        <field name="auto_pull_orders" widget="boolean_toggle"/>
+                                        <small style="color: #6c757d; display: block; margin-top: 6px;">Automatically pull new orders</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Enhanced Statistics Dashboard -->
+                            <div class="card-enhanced" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 24px; padding: 36px; box-shadow: 0 16px 64px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid rgba(40,167,69,0.1); position: relative; overflow: hidden;">
+                                <div style="position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #28a745, #20c997); border-radius: 24px 24px 0 0;"></div>
+                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(40,167,69,0.02) 0%, transparent 50%); pointer-events: none;"></div>
                                 
-                                <group>
-                                    <field name="name" readonly="1"
-                                           style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"
-                                           placeholder="Enter marketplace name"/>
-                                </group>
-                            </div>
-
-                            <!-- API Configuration Card -->
-                            <div class="card-enhanced" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 24px; padding: 36px; box-shadow: 0 16px 64px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid rgba(255,193,7,0.1); position: relative; overflow: hidden;">
-                                <div style="position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #ffc107, #fd7e14); border-radius: 24px 24px 0 0;"></div>
-                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,193,7,0.02) 0%, transparent 50%); pointer-events: none;"></div>
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px;">
+                                    <h3 style="margin: 0; color: #495057; font-weight: 800; display: flex; align-items: center; font-size: 22px;">
+                                        <div style="background: linear-gradient(135deg, #28a745, #20c997); padding: 14px; border-radius: 16px; margin-right: 16px; box-shadow: 0 8px 24px rgba(40,167,69,0.3);">
+                                            <i class="fa fa-bar-chart" style="color: white; font-size: 20px;" title="Statistics and Performance"></i>
+                                        </div>
+                                        Performance Statistics
+                                    </h3>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 16px;">
+                                        <small style="color: #6c757d; font-weight: 600;">
+                                            Last updated: <field name="last_sync_date" readonly="1" widget="datetime"/>
+                                        </small>
+                                        <button name="recalculate_sync_stats" type="object" class="btn btn-outline-primary btn-sm" 
+                                                style="border-radius: 12px; padding: 8px 16px; font-weight: 700; border: 2px solid #007bff; color: #007bff; background: transparent; transition: all 0.3s ease;">
+                                            <i class="fa fa-refresh" style="margin-right: 6px;" title="Refresh Statistics"></i>Refresh
+                                        </button>
+                                    </div>
+                                </div>
                                 
-                                <h3 style="margin: 0 0 28px 0; color: #495057; font-weight: 800; display: flex; align-items: center; font-size: 20px;">
-                                    <div style="background: linear-gradient(135deg, #ffc107, #fd7e14); padding: 12px; border-radius: 16px; margin-right: 16px; box-shadow: 0 8px 24px rgba(255,193,7,0.3);">
-                                        <i class="fa fa-key" style="color: white; font-size: 18px;" title="API Settings"></i>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px;">
+                                    <!-- Products Synced Card -->
+                                    <div style="text-align: center; padding: 32px 28px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 20px; border: 2px solid rgba(33,150,243,0.2); position: relative; overflow: hidden;">
+                                        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%); pointer-events: none;"></div>
+                                        <div style="position: relative; z-index: 1;">
+                                            <div style="background: rgba(25,118,210,0.1); padding: 16px; border-radius: 16px; display: inline-block; margin-bottom: 16px;">
+                                                <i class="fa fa-cube" style="font-size: 28px; color: #1976d2;" title="Products Synced"></i>
+                                            </div>
+                                            <div style="font-size: 36px; font-weight: 900; color: #1976d2; margin-bottom: 12px; text-shadow: 0 2px 4px rgba(25,118,210,0.2);">
+                                                <field name="total_products_synced" readonly="1"/>
+                                            </div>
+                                            <div style="color: #1976d2; font-weight: 700; font-size: 18px;">Products Synced</div>
+                                            <div style="color: rgba(25,118,210,0.7); font-size: 13px; margin-top: 6px;">Products with Cartona ID</div>
+                                        </div>
                                     </div>
-                                    API Configuration
-                                </h3>
-                                
-                                <group>
-                                    <field name="api_base_url" 
-                                           style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"/>
-                                    <field name="auth_token" password="True" 
-                                           style="padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"/>
-                                    <field name="auth_header" invisible="1"/>
-                                </group>
-                            </div>
-                        </div>
 
-                        <!-- Sync Settings Section -->
-                        <div style="background: white; border-radius: 16px; padding: 32px; box-shadow: 0 8px 32px rgba(0,0,0,0.08); border: 1px solid #e9ecef; margin-bottom: 40px;">
-                            <h3 style="margin: 0 0 24px 0; color: #495057; font-weight: 700; display: flex; align-items: center;">
-                                <i class="fa fa-sync-alt" style="margin-right: 12px; color: #6c757d;" title="Synchronization Settings"></i>
-                                Synchronization Settings
-                            </h3>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;">
-                                <div style="padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 4px solid #28a745;">
-                                    <field name="auto_sync_stock" widget="boolean_toggle"/>
-                                    <small style="color: #6c757d; display: block; margin-top: 6px;">Automatically sync stock levels</small>
-                                </div>
-                                <div style="padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 4px solid #ffc107;">
-                                    <field name="auto_sync_prices" widget="boolean_toggle"/>
-                                    <small style="color: #6c757d; display: block; margin-top: 6px;">Automatically sync price changes</small>
-                                </div>
-                                <div style="padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 4px solid #17a2b8;">
-                                    <field name="auto_pull_orders" widget="boolean_toggle"/>
-                                    <small style="color: #6c757d; display: block; margin-top: 6px;">Automatically pull new orders</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Enhanced Statistics Dashboard -->
-                        <div class="card-enhanced" style="background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 24px; padding: 36px; box-shadow: 0 16px 64px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04); border: 2px solid rgba(40,167,69,0.1); position: relative; overflow: hidden;">
-                            <div style="position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, #28a745, #20c997); border-radius: 24px 24px 0 0;"></div>
-                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(40,167,69,0.02) 0%, transparent 50%); pointer-events: none;"></div>
-                            
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px;">
-                                <h3 style="margin: 0; color: #495057; font-weight: 800; display: flex; align-items: center; font-size: 22px;">
-                                    <div style="background: linear-gradient(135deg, #28a745, #20c997); padding: 14px; border-radius: 16px; margin-right: 16px; box-shadow: 0 8px 24px rgba(40,167,69,0.3);">
-                                        <i class="fa fa-bar-chart" style="color: white; font-size: 20px;" title="Statistics and Performance"></i>
+                                    <!-- Orders Pulled Card -->
+                                    <div style="text-align: center; padding: 32px 28px; background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-radius: 20px; border: 2px solid rgba(156,39,176,0.2); position: relative; overflow: hidden;">
+                                        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%); pointer-events: none;"></div>
+                                        <div style="position: relative; z-index: 1;">
+                                            <div style="background: rgba(156,39,176,0.1); padding: 16px; border-radius: 16px; display: inline-block; margin-bottom: 16px;">
+                                                <i class="fa fa-shopping-bag" style="font-size: 28px; color: #9c27b0;" title="Orders Pulled"></i>
+                                            </div>
+                                            <div style="font-size: 36px; font-weight: 900; color: #9c27b0; margin-bottom: 12px; text-shadow: 0 2px 4px rgba(156,39,176,0.2);">
+                                                <field name="total_orders_pulled" readonly="1"/>
+                                            </div>
+                                            <div style="color: #9c27b0; font-weight: 700; font-size: 18px;">Orders Pulled</div>
+                                            <div style="color: rgba(156,39,176,0.7); font-size: 13px; margin-top: 6px;">Total from marketplace</div>
+                                        </div>
                                     </div>
-                                    Performance Statistics
-                                </h3>
-                                
-                                <div style="display: flex; align-items: center; gap: 16px;">
-                                    <small style="color: #6c757d; font-weight: 600;">
-                                        Last updated: <field name="last_sync_date" readonly="1" widget="datetime"/>
-                                    </small>
-                                    <button name="recalculate_sync_stats" type="object" class="btn btn-outline-primary btn-sm" 
-                                            style="border-radius: 12px; padding: 8px 16px; font-weight: 700; border: 2px solid #007bff; color: #007bff; background: transparent; transition: all 0.3s ease;">
-                                        <i class="fa fa-refresh" style="margin-right: 6px;" title="Refresh Statistics"></i>Refresh
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px;">
-                                <!-- Products Synced Card -->
-                                <div style="text-align: center; padding: 32px 28px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 20px; border: 2px solid rgba(33,150,243,0.2); position: relative; overflow: hidden;">
-                                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%); pointer-events: none;"></div>
-                                    <div style="position: relative; z-index: 1;">
-                                        <div style="background: rgba(25,118,210,0.1); padding: 16px; border-radius: 16px; display: inline-block; margin-bottom: 16px;">
-                                            <i class="fa fa-cube" style="font-size: 28px; color: #1976d2;" title="Products Synced"></i>
-                                        </div>
-                                        <div style="font-size: 36px; font-weight: 900; color: #1976d2; margin-bottom: 12px; text-shadow: 0 2px 4px rgba(25,118,210,0.2);">
-                                            <field name="total_products_synced" readonly="1"/>
-                                        </div>
-                                        <div style="color: #1976d2; font-weight: 700; font-size: 18px;">Products Synced</div>
-                                        <div style="color: rgba(25,118,210,0.7); font-size: 13px; margin-top: 6px;">Products with Cartona ID</div>
-                                    </div>
-                                </div>
 
-                                <!-- Orders Pulled Card -->
-                                <div style="text-align: center; padding: 32px 28px; background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-radius: 20px; border: 2px solid rgba(156,39,176,0.2); position: relative; overflow: hidden;">
-                                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%); pointer-events: none;"></div>
-                                    <div style="position: relative; z-index: 1;">
-                                        <div style="background: rgba(156,39,176,0.1); padding: 16px; border-radius: 16px; display: inline-block; margin-bottom: 16px;">
-                                            <i class="fa fa-shopping-bag" style="font-size: 28px; color: #9c27b0;" title="Orders Pulled"></i>
+                                    <!-- Last Order Pull Card -->
+                                    <div style="text-align: center; padding: 32px 28px; background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); border-radius: 20px; border: 2px solid rgba(76,175,80,0.2); position: relative; overflow: hidden;">
+                                        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%); pointer-events: none;"></div>
+                                        <div style="position: relative; z-index: 1;">
+                                            <div style="background: rgba(76,175,80,0.1); padding: 16px; border-radius: 16px; display: inline-block; margin-bottom: 16px;">
+                                                <i class="fa fa-clock-o" style="font-size: 28px; color: #4caf50;" title="Last Order Pull"></i>
+                                            </div>
+                                            <div style="color: #4caf50; font-weight: 700; font-size: 16px; margin-bottom: 12px;">
+                                                <field name="last_order_pull" readonly="1" widget="datetime"/>
+                                            </div>
+                                            <div style="color: #4caf50; font-weight: 700; font-size: 18px;">Last Order Pull</div>
+                                            <div style="color: rgba(76,175,80,0.7); font-size: 13px; margin-top: 6px;">Most recent sync</div>
                                         </div>
-                                        <div style="font-size: 36px; font-weight: 900; color: #9c27b0; margin-bottom: 12px; text-shadow: 0 2px 4px rgba(156,39,176,0.2);">
-                                            <field name="total_orders_pulled" readonly="1"/>
-                                        </div>
-                                        <div style="color: #9c27b0; font-weight: 700; font-size: 18px;">Orders Pulled</div>
-                                        <div style="color: rgba(156,39,176,0.7); font-size: 13px; margin-top: 6px;">Total from marketplace</div>
-                                    </div>
-                                </div>
-
-                                <!-- Last Order Pull Card -->
-                                <div style="text-align: center; padding: 32px 28px; background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); border-radius: 20px; border: 2px solid rgba(76,175,80,0.2); position: relative; overflow: hidden;">
-                                    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%); pointer-events: none;"></div>
-                                    <div style="position: relative; z-index: 1;">
-                                        <div style="background: rgba(76,175,80,0.1); padding: 16px; border-radius: 16px; display: inline-block; margin-bottom: 16px;">
-                                            <i class="fa fa-clock-o" style="font-size: 28px; color: #4caf50;" title="Last Order Pull"></i>
-                                        </div>
-                                        <div style="color: #4caf50; font-weight: 700; font-size: 16px; margin-bottom: 12px;">
-                                            <field name="last_order_pull" readonly="1" widget="datetime"/>
-                                        </div>
-                                        <div style="color: #4caf50; font-weight: 700; font-size: 18px;">Last Order Pull</div>
-                                        <div style="color: rgba(76,175,80,0.7); font-size: 13px; margin-top: 6px;">Most recent sync</div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </sheet>
+                        </sheet>
 
-                    <!-- Custom CSS Animations -->
-                    <style>
-                        @keyframes float {
-                            0%, 100% { transform: translateY(0px) rotate(0deg); }
-                            50% { transform: translateY(-20px) rotate(180deg); }
-                        }
-                        @keyframes pulse {
-                            0%, 100% { transform: scale(1); opacity: 0.8; }
-                            50% { transform: scale(1.1); opacity: 1; }
-                        }
-                        @keyframes rotate {
-                            from { transform: rotate(0deg); }
-                            to { transform: rotate(360deg); }
-                        }
-                        .card-enhanced:hover {
-                            transform: translateY(-4px);
-                            box-shadow: 0 20px 80px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08);
-                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                        }
-                        .btn:hover {
-                            transform: translateY(-2px);
-                            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-                        }
-                    </style>
+                        <!-- Custom CSS Animations -->
+                        <style>
+                            /* Remove all animation keyframes and animation properties */
+                            /* @keyframes float { ... } */
+                            /* @keyframes pulse { ... } */
+                            /* @keyframes rotate { ... } */
+                            .card-enhanced:hover {
+                                box-shadow: 0 20px 80px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08);
+                            }
+                            .btn:hover {
+                                box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+                            }
+                        </style>
                     </div>
                 </form>
             </field>
@@ -327,18 +220,15 @@
             <field name="name">marketplace.config.list</field>
             <field name="model">marketplace.config</field>
             <field name="arch" type="xml">
-                <list string="Cartona Marketplace Configurations" 
-                      decoration-muted="active == False" 
-                      decoration-bf="active == True"
+                <list string="Cartona Marketplace Configurations" delete="false" duplicate="false" create="false"
+                      decoration-muted="connection_status == 'False'" 
+                      decoration-bf="connection_status == 'True'"
                       decoration-success="connection_status == 'connected'"
                       decoration-danger="connection_status == 'error'"
                       decoration-warning="connection_status == 'not_tested'"
                       class="o_list_view_modern">
                     <field name="sequence" widget="handle"/>
                     <field name="name" string="Configuration Name"/>
-                    <field name="active" widget="boolean_toggle" 
-                           options="{'terminology': {'string_true': 'Active', 'string_false': 'Inactive'}}"
-                           string="Status"/>
                     <field name="connection_status" 
                            decoration-success="connection_status == 'connected'" 
                            decoration-danger="connection_status == 'error'" 
@@ -359,12 +249,12 @@
                     <button name="manual_sync_products" type="object" 
                             string="Sync" icon="fa-upload" 
                             class="btn-sm btn-success" 
-                            invisible="active == False"
+                            invisible="connection_status == 'False'"
                             title="Sync Products" />
                     <button name="manual_pull_orders" type="object" 
                             string="Pull" icon="fa-download" 
                             class="btn-sm btn-warning" 
-                            invisible="active == False"
+                            invisible="connection_status == 'False'"
                             title="Pull Orders" />
                 </list>
             </field>
@@ -381,8 +271,8 @@
                     <field name="connection_status" string="Connection Status" />
 
                     <!-- Status Filters -->
-                    <filter string="Active" name="active" domain="[('active', '=', True)]" />
-                    <filter string="Inactive" name="inactive" domain="[('active', '=', False)]" />
+                    <filter string="Active" name="active" domain="[('connection_status', '=', 'True')]" />
+                    <filter string="Inactive" name="inactive" domain="[('connection_status', '=', 'False')]" />
                     <separator />
                     
                     <!-- Connection Filters -->
@@ -415,8 +305,6 @@
                     <group expand="0" string="Group By">
                         <filter string="Connection Status" name="group_connection_status"
                             domain="[]" context="{'group_by': 'connection_status'}" />
-                        <filter string="Active Status" name="group_active"
-                            domain="[]" context="{'group_by': 'active'}" />
                         <filter string="Sync Date" name="group_sync_date"
                             domain="[]" context="{'group_by': 'last_sync_date:month'}" />
                     </group>
@@ -433,7 +321,7 @@
             <field name="view_id" ref="view_marketplace_config_form" />
             <field name="context">{
                 'form_view_initial_mode': 'edit',
-                'create': True,
+                'create': False,
                 'default_name': 'Cartona',
                 'default_api_base_url': 'https://supplier-integrations.cartona.com/api/v1/',
                 'default_auth_header': 'AuthorizationToken'
@@ -510,6 +398,47 @@ action = {
 }
             </field>
         </record>
+
+    <!-- Custom Actions for Action Dropdown -->
+    <record id="action_marketplace_test_connection" model="ir.actions.server">
+        <field name="name">🔌 Test Connection</field>
+        <field name="model_id" ref="model_marketplace_config"/>
+        <field name="binding_model_id" ref="model_marketplace_config"/>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.test_connection()
+        </field>
+    </record>
+
+    <record id="action_marketplace_pull_products" model="ir.actions.server">
+        <field name="name">⬇️ Pull Products</field>
+        <field name="model_id" ref="model_marketplace_config"/>
+        <field name="binding_model_id" ref="model_marketplace_config"/>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.manual_pull_products()
+        </field>
+    </record>
+
+    <record id="action_marketplace_pull_orders" model="ir.actions.server">
+        <field name="name">🛒 Pull Orders</field>
+        <field name="model_id" ref="model_marketplace_config"/>
+        <field name="binding_model_id" ref="model_marketplace_config"/>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.manual_pull_orders()
+        </field>
+    </record>
+
+    <record id="action_marketplace_sync_products" model="ir.actions.server">
+        <field name="name">🔄 Sync Products</field>
+        <field name="model_id" ref="model_marketplace_config"/>
+        <field name="binding_model_id" ref="model_marketplace_config"/>
+        <field name="state">code</field>
+        <field name="code">
+            action = records.manual_sync_products()
+        </field>
+    </record>
 
     </data>
 </odoo>

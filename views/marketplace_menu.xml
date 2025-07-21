@@ -10,7 +10,7 @@
 
         <!-- Configuration Menu - Direct link to single config -->
         <menuitem id="menu_marketplace_config" 
-                  name="Configuration" 
+                  name="Dashboard" 
                   parent="menu_marketplace_root" 
                   action="action_open_cartona_config" 
                   sequence="20"/>
