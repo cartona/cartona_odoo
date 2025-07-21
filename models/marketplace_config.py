@@ -17,7 +17,6 @@ class MarketplaceConfig(models.Model):
     name = fields.Char(string="Marketplace Name", required=True, default="Cartona Marketplace",
                       help="Display name for this marketplace (e.g., 'Cartona', 'Amazon', 'eBay')")
     sequence = fields.Integer(string="Sequence", default=10)
-    # Removed active field to fully disable Archive action
     
     # API Configuration
     api_base_url = fields.Char(string="API Base URL", required=True,
@@ -95,16 +94,6 @@ class MarketplaceConfig(models.Model):
         for record in self:
             if record.batch_size < 1 or record.batch_size > 1000:
                 raise ValidationError(_("Batch size must be between 1 and 1000"))
-
-    @api.constrains('active')
-    def _check_single_active_config(self):
-        """Ensure only one active marketplace configuration exists"""
-        active_configs = self.search([('active', '=', True)])
-        if len(active_configs) > 1:
-            raise ValidationError(
-                _("Only one marketplace configuration can be active at a time. "
-                  "Please deactivate other configurations first.")
-            )
 
     def test_connection(self):
         """Test connection to marketplace API"""
@@ -302,8 +291,7 @@ class MarketplaceConfig(models.Model):
 
             # Check for products to sync first
             products_to_sync = this.env['product.template'].search([
-                ('marketplace_sync_enabled', '=', True),
-                ('active', '=', True)
+                ('marketplace_sync_enabled', '=', True)
             ])
 
             if not products_to_sync:
@@ -410,7 +398,7 @@ class MarketplaceConfig(models.Model):
     @api.model
     def get_active_marketplaces(self):
         """Get all active marketplace configurations"""
-        return self.search([('active', '=', True)])
+        return self.search([])
 
     def _update_sync_stats(self, products_count=0, orders_count=0, is_increment=False):
         """Update synchronization statistics

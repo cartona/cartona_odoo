@@ -208,7 +208,6 @@ class MarketplaceAPI(models.Model):
             'price': float(product_record.list_price),
             'sku': product_record.default_code or product_record.barcode or str(product_record.id),
             'category': product_record.categ_id.name if product_record.categ_id else 'General',
-            'active': product_record.active,
             'quantity': int(product_record.qty_available) if hasattr(product_record, 'qty_available') else 0,
             'currency': product_record.currency_id.name if product_record.currency_id else 'USD',
             'barcode': product_record.barcode,
@@ -435,8 +434,7 @@ class MarketplaceAPI(models.Model):
         
         # Get all products that should be synced
         products = self.env['product.template'].search([
-            ('marketplace_sync_enabled', '=', True),
-            ('active', '=', True)
+            ('marketplace_sync_enabled', '=', True)
         ])
         
         if not products:
