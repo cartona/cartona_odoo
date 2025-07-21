@@ -260,57 +260,6 @@
             </field>
         </record>
 
-        <!-- Enhanced Search View -->
-        <record id="view_marketplace_config_search" model="ir.ui.view">
-            <field name="name">marketplace.config.search</field>
-            <field name="model">marketplace.config</field>
-            <field name="arch" type="xml">
-                <search string="Cartona Marketplace Configurations">
-                    <field name="name" string="Configuration Name" />
-                    <field name="api_base_url" string="API URL" />
-                    <field name="connection_status" string="Connection Status" />
-
-                    <!-- Status Filters -->
-                    <filter string="Active" name="active" domain="[('connection_status', '=', 'True')]" />
-                    <filter string="Inactive" name="inactive" domain="[('connection_status', '=', 'False')]" />
-                    <separator />
-                    
-                    <!-- Connection Filters -->
-                    <filter string="Connected" name="connected"
-                        domain="[('connection_status', '=', 'connected')]" />
-                    <filter string="Connection Error" name="connection_error"
-                        domain="[('connection_status', '=', 'error')]" />
-                    <filter string="Not Tested" name="not_tested"
-                        domain="[('connection_status', '=', 'not_tested')]" />
-                    <separator />
-                    
-                    <!-- Sync Filters -->
-                    <filter string="Auto Sync Stock" name="auto_sync_stock"
-                        domain="[('auto_sync_stock', '=', True)]" />
-                    <filter string="Auto Sync Prices" name="auto_sync_prices"
-                        domain="[('auto_sync_prices', '=', True)]" />
-                    <filter string="Auto Pull Orders" name="auto_pull_orders"
-                        domain="[('auto_pull_orders', '=', True)]" />
-                    <separator />
-                    
-                    <!-- Performance Filters -->
-                    <filter string="Recently Synced" name="recent_sync"
-                        domain="[('last_sync_date', '>=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]" />
-                    <filter string="Has Products" name="has_products"
-                        domain="[('total_products_synced', '>', 0)]" />
-                    <filter string="Has Orders" name="has_orders"
-                        domain="[('total_orders_pulled', '>', 0)]" />
-
-                    <!-- Group By -->
-                    <group expand="0" string="Group By">
-                        <filter string="Connection Status" name="group_connection_status"
-                            domain="[]" context="{'group_by': 'connection_status'}" />
-                        <filter string="Sync Date" name="group_sync_date"
-                            domain="[]" context="{'group_by': 'last_sync_date:month'}" />
-                    </group>
-                </search>
-            </field>
-        </record>
 
         <!-- Enhanced Action for Marketplace Configuration -->
         <record id="action_marketplace_config" model="ir.actions.act_window">
