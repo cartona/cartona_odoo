@@ -10,7 +10,6 @@
             <field name="code">
 # Pull orders from all active marketplaces
 marketplaces = env['marketplace.config'].search([
-    ('active', '=', True),
     ('auto_pull_orders', '=', True)
 ])
 
@@ -49,7 +48,6 @@ products_to_sync = env['product.template'].search([
 
 if products_to_sync:
     marketplaces = env['marketplace.config'].search([
-        ('active', '=', True),
         ('auto_sync_products', '=', True)
     ])
     
