@@ -55,22 +55,30 @@ class ProductProduct(models.Model):
                         (record.cartona_id, existing[0].display_name)
                     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        # Assign cartona_id from template if not set
+        for vals in vals_list:
+            if not vals.get('cartona_id') and vals.get('product_tmpl_id'):
+                tmpl = self.env['product.template'].browse(vals['product_tmpl_id'])
+                if tmpl and tmpl.cartona_id:
+                    vals['cartona_id'] = tmpl.cartona_id
+        return super().create(vals_list)
+
     def write(self, vals):
-        """Override write to trigger stock sync on inventory changes"""
-        result = super().write(vals)
-        
-        # Check if we need to sync stock to marketplaces
-        stock_fields = ['qty_available', 'virtual_available']
-        if any(field in vals for field in stock_fields):
-            if not self.env.context.get('skip_marketplace_sync'):
-                self._trigger_stock_sync()
-                
-        return result
+        # If cartona_id is set on template, sync to variant if not set
+        res = super().write(vals)
+        for rec in self:
+            if not rec.cartona_id and rec.product_tmpl_id and rec.product_tmpl_id.cartona_id:
+                rec.cartona_id = rec.product_tmpl_id.cartona_id
+        return res
 
     def _trigger_stock_sync(self):
         """Trigger stock synchronization for this variant"""
         for record in self:
+            _logger.info(f"[CARTONA SYNC] _trigger_stock_sync called for {record.display_name}, enabled={record.marketplace_stock_sync_enabled}, cartona_id={record.cartona_id}")
             if record.marketplace_stock_sync_enabled and record.cartona_id:
+                _logger.info(f"[CARTONA SYNC] Queueing job to sync stock for {record.display_name}")
                 # Queue job for async stock sync
                 record.with_delay(
                     channel='marketplace',
@@ -80,13 +88,12 @@ class ProductProduct(models.Model):
     def _sync_stock_to_marketplaces(self):
         """Sync stock for this variant to all active marketplaces"""
         self.ensure_one()
-        
+        _logger.info(f"[CARTONA SYNC] Actually syncing stock for {self.display_name} to marketplaces")
         # Get active marketplace configurations
         marketplaces = self.env['marketplace.config'].get_active_marketplaces()
-        
         if not marketplaces:
+            _logger.info("No active marketplaces configured for sync")
             return
-            
         for marketplace in marketplaces:
             try:
                 # Log the start of stock sync
@@ -99,22 +106,18 @@ class ProductProduct(models.Model):
                     record_id=self.id,
                     record_name=self.display_name
                 )
-                
                 # Get API client for this marketplace
                 api_client = self.env['marketplace.api'].with_context(
                     marketplace_config_id=marketplace.id
                 )
-                
                 # Sync stock to this marketplace
                 success = api_client.update_product_stock(self)
-                
                 if success:
                     self.write({
                         'last_stock_sync_date': fields.Datetime.now(),
                         'stock_sync_error': False
                     })
                     _logger.info(f"Successfully synced stock for {self.display_name} to {marketplace.name}")
-                    
                     # Log successful stock sync
                     self.env['marketplace.sync.log'].log_operation(
                         marketplace_config_id=marketplace.id,
@@ -129,7 +132,6 @@ class ProductProduct(models.Model):
                     )
                 else:
                     _logger.warning(f"Failed to sync stock for {self.display_name} to {marketplace.name}")
-                    
                     # Log failed stock sync
                     self.env['marketplace.sync.log'].log_operation(
                         marketplace_config_id=marketplace.id,
@@ -143,11 +145,13 @@ class ProductProduct(models.Model):
                         records_error=1,
                         error_details="API returned failure status"
                     )
-                    
             except Exception as e:
-                error_msg = f"Stock sync error for {marketplace.name}: {str(e)}"
-                self.write({'stock_sync_error': error_msg})
-                _logger.error(f"Error syncing stock for {self.display_name} to {marketplace.name}: {e}")
+                error_msg = f"Sync error for {marketplace.name}: {str(e)}"
+                self.write({
+                    'marketplace_sync_status': 'error',
+                    'marketplace_error_message': error_msg
+                })
+                _logger.error(f"Error syncing variant {self.display_name} to {marketplace.name}: {e}")
                 
                 # Log stock sync exception
                 self.env['marketplace.sync.log'].log_operation(

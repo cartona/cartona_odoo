@@ -9,25 +9,24 @@ class StockMove(models.Model):
 
     def _action_done(self, cancel_backorder=False):
         """Override to trigger stock sync when moves are done"""
-        _logger.debug(f"[StockMove._action_done] Starting with cancel_backorder={cancel_backorder}")
-        
+        _logger.info(f"[CARTONA SYNC] StockMove._action_done called with cancel_backorder={cancel_backorder} for moves: {[m.display_name for m in self]}")
         result = super()._action_done(cancel_backorder)
         
         # Trigger stock sync for affected products
         if not self.env.context.get('skip_marketplace_sync'):
-            _logger.debug(f"[StockMove._action_done] Marketplace sync not skipped, checking products")
+            _logger.info(f"[CARTONA SYNC] Marketplace sync not skipped, checking products")
             products_to_sync = self.mapped('product_id').filtered('marketplace_stock_sync_enabled')
-            _logger.debug(f"[StockMove._action_done] Found {len(products_to_sync)} products to sync: {[p.name for p in products_to_sync]}")
+            _logger.info(f"[CARTONA SYNC] Found {len(products_to_sync)} products to sync: {[p.name for p in products_to_sync]}")
             
             if products_to_sync:
-                _logger.debug(f"[StockMove._action_done] Triggering stock sync for products")
+                _logger.info(f"[CARTONA SYNC] Triggering stock sync for products")
                 products_to_sync._trigger_stock_sync()
             else:
-                _logger.debug(f"[StockMove._action_done] No products need stock sync")
+                _logger.info(f"[CARTONA SYNC] No products need stock sync")
         else:
-            _logger.debug(f"[StockMove._action_done] Marketplace sync skipped due to context")
+            _logger.info(f"[CARTONA SYNC] Marketplace sync skipped due to context")
                 
-        _logger.debug(f"[StockMove._action_done] Completed successfully")
+        _logger.info(f"[CARTONA SYNC] StockMove._action_done completed successfully")
         return result
 
 class StockQuant(models.Model):
@@ -44,17 +43,20 @@ class StockQuant(models.Model):
     stock_sync_error = fields.Text(string="Stock Sync Error", readonly=True)
 
     def write(self, vals):
-        """Override write to trigger stock sync on quantity changes"""
+        _logger.info(f"[CARTONA SYNC] stock.quant.write called for product(s) {[q.product_id.display_name for q in self]}, vals={vals}, context={self.env.context}")
         result = super().write(vals)
-        
-        # Check if quantity changed
         if 'quantity' in vals and not self.env.context.get('skip_marketplace_sync'):
-            # Get unique products that need stock sync
             products_to_sync = self.mapped('product_id').filtered('marketplace_stock_sync_enabled')
             if products_to_sync:
-                # Trigger stock sync for affected products
+                _logger.info(f"[CARTONA SYNC] Will trigger stock sync for: {[p.display_name for p in products_to_sync]}")
                 products_to_sync._trigger_stock_sync()
-                
+            else:
+                _logger.info(f"[CARTONA SYNC] No products to sync or marketplace_stock_sync_enabled is False")
+        else:
+            if 'quantity' not in vals:
+                _logger.info("[CARTONA SYNC] 'quantity' not in vals, not triggering sync")
+            if self.env.context.get('skip_marketplace_sync'):
+                _logger.info("[CARTONA SYNC] skip_marketplace_sync in context, not triggering sync")
         return result
 
 

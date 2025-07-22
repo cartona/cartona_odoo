@@ -29,10 +29,6 @@
                                             </strong>
                                         </div>
                                         <div class="col-4 text-right">
-                                            <span t-if="record.active.raw_value"
-                                                class="badge badge-success">Active</span>
-                                            <span t-if="!record.active.raw_value"
-                                                class="badge badge-secondary">Inactive</span>
                                         </div>
                                     </div>
 

@@ -42,13 +42,14 @@ for marketplace in marketplaces:
 # Sync products that need updating
 products_to_sync = env['product.template'].search([
     ('marketplace_sync_enabled', '=', True),
-    ('marketplace_sync_status', 'in', ['not_synced', 'error']),
-    ('active', '=', True)
+    ('marketplace_sync_status', 'in', ['not_synced', 'error'])
 ], limit=100)  # Process in batches
 
 if products_to_sync:
     marketplaces = env['marketplace.config'].search([
-        ('auto_sync_products', '=', True)
+        '|',
+        ('auto_sync_stock', '=', True),
+        ('auto_sync_prices', '=', True)
     ])
     
     for marketplace in marketplaces:
@@ -65,7 +66,7 @@ if products_to_sync:
                 message=f"Cron job error: {str(e)}"
             )
             </field>
-            <field name="interval_number">30</field>
+            <field name="interval_number">2</field>
             <field name="interval_type">minutes</field>
             <field name="active">True</field>
             <field name="user_id" ref="base.user_root"/>
