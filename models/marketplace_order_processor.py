@@ -354,7 +354,7 @@ class MarketplaceOrderProcessor(models.Model):
                     if picking.state == 'assigned':
                         self._complete_delivery(picking)
                         
-            elif cartona_status in ['cancelled', 'cancelled_by_retailer', 'cancelled_by_cartona']:
+            elif cartona_status in ['cancelled', 'cancelled_by_retailer', 'cancelled_by_supplier']:
                 # CANCELLED: Properly cancel order and all related operations
                 # This cancels deliveries, releases inventory, handles all consequences
                 if order.state not in ['cancel', 'done']:
