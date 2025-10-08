@@ -14,9 +14,9 @@
                         <group>
                             <group name="marketplace_info" string="Cartona Marketplace Information">
                                 <field name="cartona_id" placeholder="retailer_12345" />
-                                <field name="marketplace_source" readonly="1" />
+                                <!-- <field name="marketplace_source" readonly="1" />
                                 <field name="partner_type_marketplace" readonly="1" />
-                                <field name="is_marketplace_customer" readonly="1" />
+                                <field name="is_marketplace_customer" readonly="1" /> -->
                             </group>
                             <group name="marketplace_sync" string="Sync Status">
                                 <field name="marketplace_sync_status" readonly="1" />
