@@ -10,7 +10,7 @@
             <field name="arch" type="xml">
                 <!-- Add marketplace tab -->
                 <xpath expr="//notebook" position="inside">
-                    <page string="Cartona Marketplace" name="marketplace" invisible="is_marketplace_customer == False">
+                    <page string="Cartona Marketplace" name="marketplace">
                         <group>
                             <group name="marketplace_info" string="Cartona Marketplace Information">
                                 <field name="cartona_id" placeholder="retailer_12345" />

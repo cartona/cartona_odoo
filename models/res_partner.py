@@ -58,7 +58,8 @@ class ResPartner(models.Model):
         """Override create to set marketplace type and sync status"""
         for vals in vals_list:
             # Auto-detect marketplace customer based on cartona_id format
-            if vals.get('cartona_id', '').startswith('retailer_'):
+            cartona_id = vals.get('cartona_id')
+            if cartona_id and isinstance(cartona_id, str) and cartona_id.startswith('retailer_'):
                 vals.update({
                     'is_marketplace_customer': True,
                     'partner_type_marketplace': 'customer',
