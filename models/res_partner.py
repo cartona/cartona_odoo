@@ -281,7 +281,7 @@ class ResPartner(models.Model):
             'tag': 'display_notification',
             'params': {
                 'title': _("Sync Started"),
-                'message': _("Customer sync started for: %s") % self.name,
+                'message': _("Sync magic coming soon! 🚀😄 Stay tuned for awesomeness!"),
                 'type': 'info',
             }
         }
