@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_marketplace_delivery_otp_wizard_form" model="ir.ui.view">
+            <field name="name">marketplace.delivery.otp.wizard.form</field>
+            <field name="model">marketplace.delivery.otp.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Retailer OTP Required">
+                    <group>
+                        <field name="order_id" readonly="1"/>
+                        <field name="marketplace_delivery_otp" password="True"
+                               placeholder="Enter OTP provided by retailer"/>
+                    </group>
+                    <footer>
+                        <button name="action_confirm" type="object"
+                                string="Confirm Delivery" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+    </data>
+</odoo>

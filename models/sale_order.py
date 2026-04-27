@@ -66,6 +66,12 @@ class SaleOrder(models.Model):
     ], string='Delivered By', default='delivered_by_supplier',
         help="Controls who handles delivery and sync permissions")
 
+    marketplace_delivery_otp = fields.Char(
+        string="Retailer OTP",
+        copy=False,
+        help="OTP collected from the retailer at delivery for Cartona payment verification"
+    )
+
 
     def write(self, vals):
         """
@@ -673,8 +679,14 @@ Business Rules:
             )
             
             # Use 'assigned_to_salesman' status for delivery validation
-            # This indicates the order has been shipped/delivered by the supplier
-            marketplace_status = 'assigned_to_salesman'
+            # This indicates the order has been shipped/delivered by the supplier.
+            # For OTP payment methods with a stored OTP, picking validation = final
+            # delivery confirmation, so send 'delivered' (which includes the OTP).
+            if (self.marketplace_payment_method in ['installment', 'wallet_top_up']
+                    and self.marketplace_delivery_otp):
+                marketplace_status = 'delivered'
+            else:
+                marketplace_status = 'assigned_to_salesman'
             
             _logger.info(f"Syncing delivery validation for order {self.name} to Cartona with status: {marketplace_status}")
             

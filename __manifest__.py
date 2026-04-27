@@ -61,6 +61,7 @@ Architecture:
         # Views - New configuration views only
         'views/marketplace_config_views.xml',
         'views/sync_dashboard_views.xml',
+        'views/marketplace_delivery_otp_wizard_views.xml',
         
         # Menu
         'views/marketplace_menu.xml',

@@ -318,14 +318,8 @@ class MarketplaceAPI(models.Model):
         return self._normalize_api_response(result)
 
     def _get_or_generate_otp(self, order_record):
-        """Get or generate OTP for delivery confirmation"""
-        # Check if OTP is stored in order
-        if hasattr(order_record, 'delivery_otp') and order_record.delivery_otp:
-            return order_record.delivery_otp
-        
-        # For now, return None - OTP should be handled separately
-        # In a real implementation, this would integrate with an OTP service
-        return None
+        """Get OTP for delivery confirmation from the order record."""
+        return order_record.marketplace_delivery_otp or None
 
     def _get_cancellation_reason(self, order_record):
         """Get cancellation reason from order"""
