@@ -479,7 +479,9 @@ class MarketplaceOrderProcessor(models.Model):
                     'marketplace_notes': item_data.get('comment'),
                 }
                 
-                line = self.env['sale.order.line'].create(line_vals)
+                line = self.env['sale.order.line'].with_context(
+                    skip_marketplace_sync=True
+                ).create(line_vals)
                 lines_created += 1
                 
             except Exception as e:

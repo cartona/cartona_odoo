@@ -535,8 +535,114 @@ Business Rules:
                 }
             }
 
-    def _sync_delivery_validation_to_cartona(self):
+    def _sync_order_details_to_marketplace(self):
         """
+        Sync order line changes (quantities, prices, new/removed lines) to Cartona.
+
+        Builds the full order_details payload from the current lines and posts it
+        to the update-order-details endpoint. Called asynchronously via queue_job.
+        """
+        self.ensure_one()
+
+        if not self.is_marketplace_order or not self.cartona_id or not self.marketplace_config_id:
+            return
+
+        try:
+            self.write({'marketplace_sync_status': 'syncing'})
+
+            api_client = self.env['marketplace.api'].with_context(
+                marketplace_config_id=self.marketplace_config_id.id
+            )
+
+            order_details = []
+            for line in self.order_line:
+                if line.marketplace_line_id:
+                    try:
+                        line_id = int(line.marketplace_line_id)
+                    except (ValueError, TypeError):
+                        _logger.warning(
+                            f"Invalid marketplace_line_id '{line.marketplace_line_id}' "
+                            f"on line {line.id} of order {self.name}, skipping"
+                        )
+                        continue
+                    order_details.append({
+                        'id': line_id,
+                        'amount': line.product_uom_qty,
+                        'price': line.price_unit,
+                        'comment': line.marketplace_notes or '',
+                    })
+                elif line.marketplace_product_id:
+                    order_details.append({
+                        'supplier_product_id': str(line.marketplace_product_id),
+                        'amount': line.product_uom_qty,
+                        'price': line.price_unit,
+                    })
+
+            if not order_details:
+                _logger.info(f"No syncable lines on order {self.name}, skipping detail sync")
+                self.write({'marketplace_sync_status': 'synced'})
+                return
+
+            result = api_client.update_order_details(self, order_details)
+
+            if result.get('success'):
+                self.write({
+                    'marketplace_sync_status': 'synced',
+                    'marketplace_sync_date': fields.Datetime.now(),
+                    'marketplace_error_message': False,
+                })
+                _logger.info(f"Successfully synced order details for {self.name} to Cartona")
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                self.write({
+                    'marketplace_sync_status': 'error',
+                    'marketplace_error_message': error_msg,
+                })
+                _logger.error(f"Failed to sync order details for {self.name}: {error_msg}")
+
+        except Exception as e:
+            error_msg = f"Order detail sync error: {str(e)}"
+            self.write({
+                'marketplace_sync_status': 'error',
+                'marketplace_error_message': error_msg,
+            })
+            _logger.error(f"Exception syncing order details for {self.name}: {e}")
+
+    def _sync_cancelled_line_to_marketplace(self, line_id):
+        """
+        Notify Cartona that a specific order line has been removed.
+
+        Args:
+            line_id (int): The Cartona order_detail.id (marketplace_line_id) being cancelled.
+        """
+        self.ensure_one()
+
+        if not self.cartona_id or not self.marketplace_config_id:
+            return
+
+        try:
+            api_client = self.env['marketplace.api'].with_context(
+                marketplace_config_id=self.marketplace_config_id.id
+            )
+
+            result = api_client.update_order_details(self, [{'id': line_id, 'cancelled': True}])
+
+            if result.get('success'):
+                _logger.info(
+                    f"Successfully cancelled line {line_id} on Cartona order {self.cartona_id}"
+                )
+            else:
+                _logger.error(
+                    f"Failed to cancel line {line_id} on Cartona order {self.cartona_id}: "
+                    f"{result.get('error', 'Unknown error')}"
+                )
+
+        except Exception as e:
+            _logger.error(
+                f"Exception cancelling line {line_id} on Cartona order {self.cartona_id}: {e}"
+            )
+
+    def _sync_delivery_validation_to_cartona(self):        """
         Sync delivery validation to Cartona when delivery status becomes 'done'.
         
         This method is called when a delivery is validated and becomes 'done'.
@@ -679,3 +785,50 @@ class SaleOrderLine(models.Model):
         string="Line Notes",
         help="Additional notes for this order line from marketplace"
     )
+
+    # Fields watched for detail sync trigger
+    _DETAIL_SYNC_FIELDS = {'product_uom_qty', 'price_unit', 'product_id', 'marketplace_notes'}
+
+    def _enqueue_detail_sync(self):
+        """Queue an async job to push the full order line state to Cartona."""
+        for order in self.mapped('order_id'):
+            if order.is_marketplace_order and order.cartona_id:
+                order.with_delay(
+                    channel='marketplace',
+                    description=f"Sync order details to Cartona [{order.name}]",
+                )._sync_order_details_to_marketplace()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        lines = super().create(vals_list)
+        if not self.env.context.get('skip_marketplace_sync'):
+            lines._enqueue_detail_sync()
+        return lines
+
+    def write(self, vals):
+        needs_sync = bool(self._DETAIL_SYNC_FIELDS & set(vals.keys()))
+        result = super().write(vals)
+        if needs_sync and not self.env.context.get('skip_marketplace_sync'):
+            self._enqueue_detail_sync()
+        return result
+
+    def unlink(self):
+        to_cancel = []
+        for line in self:
+            if line.marketplace_line_id and line.order_id.is_marketplace_order:
+                try:
+                    to_cancel.append((line.order_id, int(line.marketplace_line_id)))
+                except (ValueError, TypeError):
+                    _logger.warning(
+                        f"Invalid marketplace_line_id '{line.marketplace_line_id}' "
+                        f"on line {line.id}, skipping cancel sync"
+                    )
+        result = super().unlink()
+        if not self.env.context.get('skip_marketplace_sync'):
+            for order, line_id in to_cancel:
+                if order.cartona_id and order.marketplace_config_id:
+                    order.with_delay(
+                        channel='marketplace',
+                        description=f"Cancel line {line_id} on Cartona order [{order.name}]",
+                    )._sync_cancelled_line_to_marketplace(line_id)
+        return result

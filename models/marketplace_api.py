@@ -159,10 +159,14 @@ class MarketplaceAPI(models.Model):
         """Bulk update multiple products with only required fields for Cartona API"""
         products_data = []
         for product in product_records:
-            products_data.append({
+            entry = {
                 'supplier_product_id': product.cartona_id,
-                'selling_price': str(product.list_price)
-            })
+                'selling_price': str(product.list_price),
+                'odoo_product_id': str(product.id),
+            }
+            if product.default_code:
+                entry['odoo_product_code'] = product.default_code
+            products_data.append(entry)
         if not products_data:
             return {'success': False, 'error': 'No products to update'}
         _logger.info(f"[Cartona API Request Body] /api/v1/supplier-product/bulk-update: {products_data}")
@@ -405,18 +409,18 @@ class MarketplaceAPI(models.Model):
         # For any other type, wrap it in a success response
         return {'success': True, 'data': response}
 
-    def update_order_details(self, order_record, updates):
-        """Update order details (quantities, items, etc.)"""
+    def update_order_details(self, order_record, order_details_list):
+        """Update order line details (quantities, prices, cancellations) for a Cartona order."""
         if not order_record.cartona_id:
             return {'success': False, 'error': 'Missing external order ID'}
-            
-        order_data = {
-            'order_id': order_record.cartona_id,
-            'updates': updates,
-            'updated_at': fields.Datetime.now().isoformat()
-        }
-        
-        return self._make_api_request('order/update-order-details', method='POST', data=[order_data])
+
+        payload = [{
+            'hashed_id': order_record.cartona_id,
+            'order_details': order_details_list,
+        }]
+        _logger.info(f"[Cartona API] POST order/update-order-details BODY: {payload}")
+        result = self._make_api_request('order/update-order-details', method='POST', data=payload)
+        return self._normalize_api_response(result)
 
     # ===== SYNCHRONIZATION METHODS =====
 
