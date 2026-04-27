@@ -243,13 +243,13 @@ class SaleOrder(models.Model):
         Returns:
             str: Mapped marketplace status or None
         """
-        # Enhanced mapping based on Cartona API documentation
+        # In Odoo 18, sale.order.state has no 'done' value (locking only sets locked=True).
+        # 'delivered' is sent via _sync_delivery_validation_to_cartona when the picking is validated.
         status_mapping = {
-            'draft': 'pending',           # Order created, pending approval
-            'sent': 'pending',            # Quotation sent, still pending
-            'sale': 'approved',           # Sales order confirmed
-            'done': 'delivered',          # Order completed/delivered
-            'cancel': 'cancelled_by_supplier',  # Order cancelled
+            'draft': 'pending',
+            'sent': 'pending',
+            'sale': 'approved',
+            'cancel': 'cancelled_by_supplier',
         }
         
         return status_mapping.get(self.state)
@@ -677,16 +677,13 @@ Business Rules:
             api_client = self.env['marketplace.api'].with_context(
                 marketplace_config_id=self.marketplace_config_id.id
             )
-            
-            # Use 'assigned_to_salesman' status for delivery validation
-            # This indicates the order has been shipped/delivered by the supplier.
-            # For OTP payment methods with a stored OTP, picking validation = final
-            # delivery confirmation, so send 'delivered' (which includes the OTP).
-            if (self.marketplace_payment_method in ['installment', 'wallet_top_up']
-                    and self.marketplace_delivery_otp):
-                marketplace_status = 'delivered'
-            else:
-                marketplace_status = 'assigned_to_salesman'
+
+            # Validating the delivery picking = the order has been physically handed
+            # to the retailer. In Odoo 18 sale.order.state never reaches 'done', so
+            # this is the only place 'delivered' can be sent. For OTP payment methods
+            # (installment / wallet_top_up), update_single_order_status automatically
+            # includes retailer_otp from marketplace_delivery_otp when status='delivered'.
+            marketplace_status = 'delivered'
             
             _logger.info(f"Syncing delivery validation for order {self.name} to Cartona with status: {marketplace_status}")
             
