@@ -642,7 +642,8 @@ Business Rules:
                 f"Exception cancelling line {line_id} on Cartona order {self.cartona_id}: {e}"
             )
 
-    def _sync_delivery_validation_to_cartona(self):        """
+    def _sync_delivery_validation_to_cartona(self):
+        """
         Sync delivery validation to Cartona when delivery status becomes 'done'.
         
         This method is called when a delivery is validated and becomes 'done'.
