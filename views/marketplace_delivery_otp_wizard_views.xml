@@ -8,7 +8,7 @@
                 <form string="Retailer OTP Required">
                     <group>
                         <field name="order_id" readonly="1"/>
-                        <field name="marketplace_delivery_otp" password="True"
+                        <field name="marketplace_delivery_otp" required="1" password="True"
                                placeholder="Enter OTP provided by retailer"/>
                     </group>
                     <footer>

@@ -10,7 +10,7 @@ class MarketplaceDeliveryOtpWizard(models.TransientModel):
 
     picking_id = fields.Many2one('stock.picking', required=True)
     order_id = fields.Many2one('sale.order', related='picking_id.sale_id')
-    marketplace_delivery_otp = fields.Char(string="Retailer OTP", required=True)
+    marketplace_delivery_otp = fields.Char(string="Retailer OTP")
 
     def action_confirm(self):
         self.ensure_one()
