@@ -15,47 +15,46 @@ class MarketplaceDeliveryOtpWizard(models.TransientModel):
     def action_confirm(self):
         self.ensure_one()
         order = self.order_id
+
+        # Store OTP on the order so _sync_delivery_validation_to_cartona can include it
         order.marketplace_delivery_otp = self.marketplace_delivery_otp
 
-        # skip_marketplace_delivery_sync suppresses only the delivery status enqueue
-        # in button_validate — stock sync (StockMove._action_done, StockQuant.write)
-        # still fires because those gate on skip_marketplace_sync, not this flag.
+        # Call Cartona FIRST — only proceed with picking validation if Cartona accepts.
+        # This prevents marking a delivery as done in Odoo when Cartona rejects the OTP.
+        order._sync_delivery_validation_to_cartona()
+
+        if order.marketplace_sync_status != 'synced':
+            # Cartona rejected (wrong OTP, API error, etc.) — clear OTP and abort
+            order.marketplace_delivery_otp = False
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Delivery Blocked'),
+                    'message': order.marketplace_error_message or _('Cartona rejected the delivery confirmation. Picking was NOT validated.'),
+                    'type': 'danger',
+                    'sticky': True,
+                },
+            }
+
+        # Cartona accepted — now validate the picking in Odoo.
+        # skip_marketplace_delivery_sync=True since Cartona is already updated.
         result = self.picking_id.with_context(
             skip_otp_check=True,
             skip_marketplace_delivery_sync=True,
         ).button_validate()
 
-        # If button_validate returned a sub-wizard (e.g. backorder dialog),
-        # the picking is not done yet — hand off to that wizard and skip sync.
-        if isinstance(result, dict) and result.get('res_model'):
-            return result
-
-        # Only sync if the picking actually became done
-        if self.picking_id.state != 'done':
-            return result
-
-        # Synchronous call: admin sees success or Cartona error right away
-        order._sync_delivery_validation_to_cartona()
-
-        if order.marketplace_sync_status == 'synced':
+        if not result:
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
                     'title': _('Delivery Confirmed'),
-                    'message': _('Order %s delivery synced to Cartona successfully.') % order.name,
+                    'message': _('Order %s confirmed and synced to Cartona successfully.') % order.name,
                     'type': 'success',
                     'sticky': False,
                 },
             }
-        else:
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': _('Cartona Sync Failed'),
-                    'message': order.marketplace_error_message or _('Unknown error from Cartona API.'),
-                    'type': 'danger',
-                    'sticky': True,
-                },
-            }
+
+        # button_validate returned a sub-action (e.g. backorder dialog) — hand it off
+        return result
