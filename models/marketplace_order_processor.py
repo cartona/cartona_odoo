@@ -4,6 +4,9 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+# Cartona statuses that map to a cancelled Odoo sale order.
+_CANCEL_STATUSES = frozenset(['cancelled', 'cancelled_by_retailer', 'cancelled_by_supplier'])
+
 
 class MarketplaceOrderProcessor(models.Model):
     _name = 'marketplace.order.processor'
@@ -23,18 +26,10 @@ class MarketplaceOrderProcessor(models.Model):
 
     def process_marketplace_order(self, order_data):
         """Process a single order from marketplace"""
-        
+
         try:
             config = self._get_marketplace_config()
-            
-            # Remove per-order info log here
-            # self.env['marketplace.sync.log'].log_operation(
-            #     marketplace_config_id=config.id,
-            #     operation_type='order_pull',
-            #     status='info',
-            #     message=f"Starting order processing for order {order_data.get('order_id', 'unknown')}"
-            # )
-            
+
             # Extract and validate order data
             validated_order = self._validate_order_data(order_data)
             
@@ -286,10 +281,11 @@ class MarketplaceOrderProcessor(models.Model):
                 order.unlink()
                 return None
             
-            # Now apply proper state transitions based on Cartona status
-            # This ensures all business consequences happen correctly
+            # Apply the state transition that matches the incoming Cartona status.
+            # If the transition fails the order is left in draft; the next pull will
+            # find it via _find_existing_order and retry via _update_existing_order.
             self._apply_cartona_state_action(order, marketplace_status)
-                
+
             return order
             
         except Exception as e:
@@ -298,81 +294,113 @@ class MarketplaceOrderProcessor(models.Model):
 
     def _apply_cartona_state_action(self, order, cartona_status):
         """
-        Apply proper Odoo actions based on Cartona status instead of just setting states.
-        
-        This is the core method that ensures business logic is properly executed:
-        - 'approved': Confirms order (creates deliveries, allocates inventory)
-        - 'assigned_to_salesman': Confirms + assigns delivery (ready state)
-        - 'delivered': Confirms + assigns + completes delivery (done state)
-        - 'cancelled': Properly cancels order and all related deliveries
-        
-        Args:
-            order (sale.order): The order to transition
-            cartona_status (str): Cartona marketplace status
+        Drive the Odoo sale order to the state implied by the Cartona status.
+
+        Uses proper Odoo action methods rather than writing ``state`` directly so
+        that all downstream business logic (delivery creation, inventory allocation,
+        accounting entries, etc.) fires correctly.
+
+        ``skip_marketplace_sync=True`` is injected into the execution context for
+        every write/action so that our own ``sale.order.write`` override does not
+        schedule a redundant outbound sync call.
+
+        Returns:
+            bool: ``True`` when the transition succeeded (or the order was already
+                  in the correct state).  ``False`` on any error — the caller must
+                  NOT persist the new ``marketplace_status`` so the next pull can
+                  retry automatically.
         """
-        
         try:
-            _logger.info(f"Applying Cartona status '{cartona_status}' to order {order.name}")
-            
-            # Use context to skip marketplace sync and avoid infinite loops
+            _logger.info("Applying Cartona status '%s' to order %s", cartona_status, order.name)
+
             order_ctx = order.with_context(skip_marketplace_sync=True)
-            
+
             if cartona_status == 'approved':
-                # APPROVED: Transition from draft to sale
-                # This creates delivery orders, allocates inventory, sends notifications
                 if order.state == 'draft':
                     order_ctx.action_confirm()
-                    _logger.info(f"Order {order.name} confirmed (approved) - deliveries created")
-                    
+                    _logger.info("Order %s confirmed — deliveries created", order.name)
+
             elif cartona_status == 'assigned_to_salesman':
-                # ASSIGNED TO SALESMAN: Confirm order + assign delivery (ready state)
-                # First confirm if still in draft
                 if order.state == 'draft':
                     order_ctx.action_confirm()
-                
-                # Then try to assign all outgoing deliveries (reserve inventory)
-                for picking in order.picking_ids.filtered(lambda p: p.picking_type_code == 'outgoing'):
-                    if picking.state in ['confirmed', 'waiting']:
-                        try:
-                            picking.action_assign()
-                            _logger.info(f"Delivery {picking.name} assigned (ready) for order {order.name}")
-                        except Exception as e:
-                            _logger.warning(f"Could not assign delivery {picking.name}: {e}")
-                            
+                for picking in order.picking_ids.filtered(
+                    lambda p: p.picking_type_code == 'outgoing' and p.state in ['confirmed', 'waiting']
+                ):
+                    try:
+                        picking.action_assign()
+                        _logger.info("Delivery %s assigned (ready) for order %s", picking.name, order.name)
+                    except Exception as e:  # non-fatal — partial assignment is acceptable
+                        _logger.warning("Could not assign delivery %s: %s", picking.name, e)
+
             elif cartona_status == 'delivered':
-                # DELIVERED: Complete the entire order workflow
-                # Confirm order if needed
                 if order.state == 'draft':
                     order_ctx.action_confirm()
-                
-                # Complete all outgoing deliveries
                 for picking in order.picking_ids.filtered(lambda p: p.picking_type_code == 'outgoing'):
-                    # First assign if not already assigned
                     if picking.state in ['confirmed', 'waiting']:
                         picking.action_assign()
-                    # Then complete the delivery
                     if picking.state == 'assigned':
                         self._complete_delivery(picking)
-                        
-            elif cartona_status in ['cancelled', 'cancelled_by_retailer', 'cancelled_by_supplier']:
-                # CANCELLED: Properly cancel order and all related operations
-                # This cancels deliveries, releases inventory, handles all consequences
+
+            elif cartona_status in _CANCEL_STATUSES:
                 if order.state not in ['cancel', 'done']:
-                    order_ctx.action_cancel()
-                    _logger.info(f"Order {order.name} cancelled - all deliveries cancelled")
-                    
+                    # Guard: if at least one outgoing delivery has already been
+                    # validated (done), the order has physically left the warehouse
+                    # and cannot be reversed from this background job.  Log a
+                    # warning, leave the Odoo order as-is, and return True so the
+                    # caller records the new marketplace_status without retrying.
+                    done_pickings = order.picking_ids.filtered(
+                        lambda p: p.picking_type_code == 'outgoing' and p.state == 'done'
+                    )
+                    if done_pickings:
+                        _logger.warning(
+                            "Order %s received '%s' from Cartona but has validated "
+                            "delivery/deliveries (%s) — Odoo cancellation skipped. "
+                            "Manual review required.",
+                            order.name,
+                            cartona_status,
+                            ', '.join(done_pickings.mapped('name')),
+                        )
+                        # Mark the order so it surfaces in a manual review queue.
+                        order.with_context(skip_marketplace_sync=True).write({
+                            'marketplace_sync_status': 'error',
+                            'marketplace_error_message': _(
+                                "Cartona sent '%s' but the order has a validated delivery (%s). "
+                                "Manual cancellation / return required."
+                            ) % (cartona_status, ', '.join(done_pickings.mapped('name'))),
+                        })
+                        return True
+
+                    # Cancel any pending stock pickings first; otherwise the SO
+                    # cancellation would be blocked by reserved moves.
+                    order.picking_ids.filtered(
+                        lambda p: p.state not in ['done', 'cancel']
+                    ).action_cancel()
+                    # Call _action_cancel() directly to bypass the Odoo 18
+                    # cancel-confirmation wizard that action_cancel() may return
+                    # instead of performing the cancellation.
+                    order_ctx._action_cancel()
+                    if order.state != 'cancel':
+                        raise UserError(_(
+                            "Could not cancel order %s (state is still '%s'). "
+                            "Manual intervention required."
+                        ) % (order.name, order.state))
+                    _logger.info("Order %s cancelled — all deliveries cancelled", order.name)
+
             elif cartona_status == 'return':
-                # RETURN: Special case - requires manual handling
-                # Returns are complex and need human intervention
-                _logger.info(f"Order {order.name} marked as return - manual handling required")
-                
+                _logger.info("Order %s marked as return — manual handling required", order.name)
+
+            return True
+
         except Exception as e:
-            _logger.error(f"Error applying Cartona state '{cartona_status}' to order {order.name}: {e}")
-            # Store error info in order for debugging
-            order.write({
+            _logger.error(
+                "Error applying Cartona status '%s' to order %s: %s",
+                cartona_status, order.name, e,
+            )
+            order.with_context(skip_marketplace_sync=True).write({
                 'marketplace_sync_status': 'error',
-                'marketplace_error_message': f"State transition error: {str(e)}"
+                'marketplace_error_message': "State transition error: %s" % e,
             })
+            return False
 
     def _complete_delivery(self, picking):
         """
@@ -424,30 +452,50 @@ class MarketplaceOrderProcessor(models.Model):
         try:
             marketplace_status = order_data.get('status', 'pending')
             current_status = order.marketplace_status
-            
-            # Update marketplace-specific information
-            update_vals = {
-                'marketplace_status': marketplace_status,
-                'marketplace_sync_date': fields.Datetime.now(),
-                'marketplace_sync_status': 'synced',
-            }
-            
-            # Update notes if provided
-            if order_data.get('notes'):
-                update_vals['marketplace_notes'] = order_data['notes']
-                
-            # Update without triggering marketplace sync (avoid loops)
-            order.with_context(skip_marketplace_sync=True).write(update_vals)
-            
-            # Apply state transition only if status actually changed
-            # This prevents unnecessary processing and ensures idempotency
-            if current_status != marketplace_status:
-                _logger.info(f"Status changed for order {order.name}: {current_status} -> {marketplace_status}")
-                self._apply_cartona_state_action(order, marketplace_status)
-            
-            _logger.info(f"Updated existing order {order.name} - Status: {marketplace_status}")
-            return True
-            
+
+            # Decide whether to (re-)apply the state transition. We do so when:
+            #   a) The incoming marketplace_status differs from what is stored — the
+            #      normal case for a status update.
+            #   b) The Odoo order state does not reflect the stored marketplace_status
+            #      (odoo_state_out_of_sync). This handles orders where a previous pull
+            #      wrote the marketplace_status before the Odoo transition succeeded,
+            #      permanently preventing a retry. We detect the two most critical
+            #      mismatches: a cancellation that never landed, and a confirmation
+            #      that never fired.
+            odoo_state_out_of_sync = (
+                marketplace_status in _CANCEL_STATUSES and order.state not in ['cancel', 'done']
+            ) or (
+                marketplace_status == 'approved' and order.state == 'draft'
+            )
+
+            needs_transition = current_status != marketplace_status or odoo_state_out_of_sync
+            transition_ok = True
+            if needs_transition:
+                _logger.info(
+                    "Applying transition for order %s: marketplace=%s, odoo=%s, stored=%s",
+                    order.name, marketplace_status, order.state, current_status,
+                )
+                transition_ok = self._apply_cartona_state_action(order, marketplace_status)
+
+            if transition_ok:
+                update_vals = {
+                    'marketplace_status': marketplace_status,
+                    'marketplace_sync_date': fields.Datetime.now(),
+                    'marketplace_sync_status': 'synced',
+                }
+                if order_data.get('notes'):
+                    update_vals['marketplace_notes'] = order_data['notes']
+                order.with_context(skip_marketplace_sync=True).write(update_vals)
+                _logger.info("Updated existing order %s — status: %s", order.name, marketplace_status)
+            else:
+                _logger.warning(
+                    "State transition failed for order %s (%s → %s). "
+                    "marketplace_status not updated; next pull will retry.",
+                    order.name, current_status, marketplace_status,
+                )
+
+            return transition_ok
+
         except Exception as e:
             _logger.error(f"Error updating existing order: {e}")
             return False
