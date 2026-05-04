@@ -1,5 +1,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+import json
 import requests
 import logging
 
@@ -71,6 +72,8 @@ class MarketplaceConfig(models.Model):
         default="""{
     "approved": "sale",
     "cancelled": "cancel",
+    "cancelled_by_supplier": "cancel",
+    "cancelled_by_retailer": "cancel",
     "assigned_to_salesman": "sale",
     "delivered": "done",
     "return": "draft"
@@ -666,48 +669,62 @@ class MarketplaceConfig(models.Model):
 
     def get_state_mapping(self):
         """
-        Get state mapping configuration for order pulling.
-        
-        This method returns the mapping between Cartona marketplace statuses
-        and Odoo order states. The actual state transitions are handled by
-        proper Odoo actions in _apply_cartona_state_action().
-        
-        Cartona Status → Odoo State:
-        - approved → sale (order confirmed)
-        - cancelled → cancel (order cancelled)
-        - assigned_to_salesman → sale (will be handled by delivery assignment)
-        - delivered → done (order completed)
-        - return → draft (returns need manual handling)
-        
+        Return the mapping from Cartona marketplace statuses to Odoo order states.
+
+        This mapping drives the *outer* state-change detection in
+        ``MarketplaceOrderProcessor._update_existing_order``.  The actual Odoo
+        transitions (confirm, cancel, etc.) are performed by
+        ``_apply_cartona_state_action``, which calls the proper action methods
+        rather than writing ``state`` directly.
+
+        Default mapping:
+
+        ========================  ===========
+        Cartona status            Odoo state
+        ========================  ===========
+        approved                  sale
+        assigned_to_salesman      sale
+        delivered                 done
+        cancelled                 cancel
+        cancelled_by_supplier     cancel
+        cancelled_by_retailer     cancel
+        return                    draft
+        ========================  ===========
+
+        A custom JSON mapping can be configured per integration via the
+        *Custom State Mapping* field when *Enable Custom State Mapping* is
+        checked.
+
         Returns:
-            dict: Mapping of marketplace statuses to Odoo states
+            dict: ``{cartona_status: odoo_state}``
         """
         self.ensure_one()
-        
-        # Simplified state mapping based on Cartona requirements
-        # Note: The actual state transitions are handled by proper Odoo actions
-        # This mapping is just for reference - the real logic is in _apply_cartona_state_action
+
         default_mapping = {
             'approved': 'sale',
-            'cancelled': 'cancel',
-            'assigned_to_salesman': 'sale',  # Will be handled by delivery assignment
+            'assigned_to_salesman': 'sale',
             'delivered': 'done',
-            'return': 'draft',  # Returns need manual handling
+            'cancelled': 'cancel',
+            'cancelled_by_supplier': 'cancel',
+            'cancelled_by_retailer': 'cancel',
+            'return': 'draft',
         }
-        
-        # Use custom mapping if enabled
+
         if self.enable_custom_state_mapping and self.custom_state_mapping:
             try:
-                import json
                 custom_mapping = json.loads(self.custom_state_mapping)
                 if isinstance(custom_mapping, dict):
-                    _logger.info(f"Using custom state mapping for {self.name}")
+                    _logger.info("Using custom state mapping for %s", self.name)
                     return custom_mapping
-                else:
-                    _logger.warning(f"Invalid custom state mapping format for {self.name}, using default")
+                _logger.warning(
+                    "Invalid custom state mapping format for %s, using default", self.name
+                )
             except (json.JSONDecodeError, Exception) as e:
-                _logger.warning(f"Failed to parse custom state mapping for {self.name}: {e}, using default")
-        
+                _logger.warning(
+                    "Failed to parse custom state mapping for %s: %s — using default",
+                    self.name, e,
+                )
+
         return default_mapping
 
     def _update_product_stock(self, product, stock_quantity):
