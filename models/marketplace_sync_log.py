@@ -97,7 +97,7 @@ class MarketplaceSyncLog(models.Model):
             'action_type': 'automated',
         }
         
-        return self.create(vals)
+        return self.sudo().create(vals)
 
     @api.model
     def log_product_sync(self, marketplace_config_id, product, status, message, **kwargs):
