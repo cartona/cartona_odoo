@@ -78,8 +78,7 @@
                                                style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 2px solid #e9ecef; transition: all 0.3s ease;"
                                                placeholder="Enter marketplace name"/>
                                         <field name="company_id"
-                                               groups="base.group_multi_company"
-                                               readonly="[('id', '!=', False)]"/>
+                                               groups="base.group_multi_company"/>
                                     </group>
                                 </div>
 
