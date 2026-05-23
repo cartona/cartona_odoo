@@ -18,7 +18,13 @@ class MarketplaceConfig(models.Model):
     name = fields.Char(string="Marketplace Name", required=True, default="Cartona Marketplace",
                       help="Display name for this marketplace (e.g., 'Cartona', 'Amazon', 'eBay')")
     sequence = fields.Integer(string="Sequence", default=10)
-    
+    company_id = fields.Many2one(
+        'res.company',
+        string='Company',
+        required=True,
+        default=lambda self: self.env.company,
+    )
+
     # API Configuration
     api_base_url = fields.Char(string="API Base URL", required=True,
                               default="https://supplier-integrations.cartona.com/api/v1/",

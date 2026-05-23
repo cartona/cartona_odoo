@@ -585,7 +585,7 @@ class MarketplaceAPI(models.Model):
             }
         
         # Process each order
-        processor = self.env['marketplace.order.processor']
+        processor = self.env['marketplace.order.processor'].with_company(config.company_id)
         orders_processed = 0
         orders_new = 0
         orders_updated = 0

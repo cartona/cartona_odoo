@@ -259,6 +259,7 @@ class MarketplaceOrderProcessor(models.Model):
             # We'll apply proper state transitions afterward using Odoo actions
             order_vals = {
                 'partner_id': customer.id,
+                'company_id': config.company_id.id,
                 'cartona_id': order_data['order_id'],  # External ID for sync
                 'marketplace_config_id': config.id,
                 'is_marketplace_order': True,

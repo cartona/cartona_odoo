@@ -132,6 +132,7 @@ class ResPartner(models.Model):
             
         # Try to find existing customer
         partner = self.search([
+            ('company_id', 'in', [self.env.company.id, False]),
             '|', '|',
             ('cartona_id', '=', external_id),
             ('phone', '=', retailer_number),
@@ -163,6 +164,7 @@ class ResPartner(models.Model):
         
         vals = {
             'name': name,
+            'company_id': self.env.company.id,
             'phone': phone,
             'mobile': customer_data.get('retailer_number2') or customer_data.get('mobile'),
             'email': customer_data.get('retailer_email') or customer_data.get('email'),
