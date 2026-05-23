@@ -273,9 +273,16 @@ class MarketplaceOrderProcessor(models.Model):
             
             order = self.env['sale.order'].create(order_vals)
             
-            # Create order lines from Cartona order details
-            success = self._create_order_lines(order, order_data['order_lines'])
-            
+            try:
+                # Create order lines from Cartona order details.
+                # _create_order_lines raises UserError if any product is missing,
+                # which is caught here so the draft order is always cleaned up.
+                success = self._create_order_lines(order, order_data['order_lines'])
+            except Exception as line_err:
+                _logger.error("Order line creation failed for order %s, deleting: %s", order.name, line_err)
+                order.unlink()
+                return None
+
             if not success:
                 _logger.error("Order line creation failed, deleting order")
                 order.unlink()
@@ -511,8 +518,10 @@ class MarketplaceOrderProcessor(models.Model):
                 product = self._find_or_create_product(item_data)
                 
                 if not product:
-                    _logger.warning(f"Could not find/create product for {item_data['product_id']}. Skipping line.")
-                    continue
+                    raise UserError(
+                        f"Product with cartona_id={item_data['product_id']} not found in Odoo. "
+                        f"Sync products before pulling orders."
+                    )
                 
                 # Create order line
                 line_vals = {
@@ -532,6 +541,8 @@ class MarketplaceOrderProcessor(models.Model):
                 ).create(line_vals)
                 lines_created += 1
                 
+            except UserError:
+                raise
             except Exception as e:
                 _logger.error(f"Error creating order line for item {item_data.get('product_id', 'unknown')}: {e}")
                 continue
@@ -554,44 +565,55 @@ class MarketplaceOrderProcessor(models.Model):
             return None
 
     def _find_or_create_product(self, item_data):
-        """Find or create product from marketplace item data"""
-        
+        """Find product variant for a marketplace order line.
+
+        Always returns a ``product.product`` record (never ``product.template``)
+        because ``sale.order.line.product_id`` is a Many2one to ``product.product``.
+
+        Lookup order:
+          1. Search ``product.product`` by variant ``cartona_id`` — covers all
+             products created/synced by this module.
+          2. Search ``product.template`` by template ``cartona_id``, then resolve
+             its first variant — covers products that pre-date the module or were
+             imported without setting the variant-level cartona_id.
+          3. Not found → log a clear error and return None.  The caller
+             (``_create_order_lines``) will raise so the entire order is rejected;
+             no partial or placeholder orders are left in Odoo.
+        """
         try:
-            # Try to find by external ID first
-            product = self.env['product.template'].find_by_cartona_id(
-                item_data['product_id']
+            cartona_id = item_data['product_id']
+
+            # Step 1: variant-level cartona_id
+            variant = self.env['product.product'].search(
+                [('cartona_id', '=', cartona_id)], limit=1
             )
-            
-            if product:
-                return product
-                
-            # Try to find by SKU
-            if item_data.get('sku'):
-                product = self.env['product.template'].search([
-                    ('default_code', '=', item_data['sku'])
-                ], limit=1)
-                
-                if product:
-                    # Update with external ID
-                    product.cartona_id = item_data['product_id']
-                    return product
-                    
-            # Create placeholder product if enabled
-            product_vals = {
-                'name': item_data.get('product_name', f"Marketplace Product {item_data['product_id']}"),
-                'cartona_id': item_data['product_id'],
-                'default_code': item_data.get('sku'),
-                'list_price': item_data.get('unit_price', 0),
-                'type': 'consu',  # Set product type to consumable
-                'is_storable': True,  # Enable storable tracking
-                'marketplace_sync_status': 'syncing',
-            }
-            
-            product = self.env['product.template'].create(product_vals)
-            return product
-            
+            if variant:
+                return variant
+
+            # Step 2: template-level cartona_id → resolve first variant
+            template = self.env['product.template'].search(
+                [('cartona_id', '=', cartona_id)], limit=1
+            )
+            if template:
+                variant = template.product_variant_ids[:1]
+                if variant:
+                    return variant
+                _logger.warning(
+                    "Product template '%s' (cartona_id=%s) has no variants — skipping",
+                    template.name, cartona_id,
+                )
+                return None
+
+            # Step 3: product not found in Odoo at all
+            _logger.error(
+                "Product with cartona_id=%s not found in Odoo. "
+                "Run product sync before pulling orders. Order will be rejected.",
+                cartona_id,
+            )
+            return None
+
         except Exception as e:
-            _logger.error(f"Error finding/creating product: {e}")
+            _logger.error("Error finding product for cartona_id=%s: %s", item_data.get('product_id'), e)
             return None
 
     def _extract_shipping_address(self, retailer_data):
