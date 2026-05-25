@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cartona_config_form" model="ir.ui.view">
+        <field name="name">cartona.config.form</field>
+        <field name="model">cartona.config</field>
+        <field name="arch" type="xml">
+            <form string="Cartona Configuration" create="false" duplicate="false" delete="false">
+                <header>
+                    <button name="test_connection" type="object" string="Test Connection" class="btn-primary"/>
+                    <button name="manual_pull_orders" type="object" string="Pull Orders"
+                            invisible="not is_cartona_sync_enabled"/>
+                    <field name="connection_status" widget="statusbar"
+                           statusbar_visible="not_tested,connected,error"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Sync Disabled"
+                            bg_color="text-bg-warning"
+                            invisible="is_cartona_sync_enabled"/>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_synced_variants" type="object"
+                                class="oe_stat_button" icon="fa-cubes">
+                            <field name="total_products_synced" widget="statinfo" string="Synced Variants"/>
+                        </button>
+                        <button name="action_view_cartona_orders" type="object"
+                                class="oe_stat_button" icon="fa-shopping-cart">
+                            <field name="total_orders_pulled" widget="statinfo" string="Cartona Orders"/>
+                        </button>
+                        <button name="action_view_sync_logs" type="object"
+                                class="oe_stat_button" icon="fa-list-alt">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Recent Activity</span>
+                            </div>
+                        </button>
+                    </div>
+                    <group>
+                        <group string="Connection">
+                            <field name="name"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="api_base_url"/>
+                            <field name="auth_token" password="True"/>
+                            <field name="is_cartona_sync_enabled"/>
+                        </group>
+                        <group string="Status">
+                            <field name="last_sync_date" readonly="1"/>
+                            <field name="last_order_pull" readonly="1"/>
+                            <field name="error_message" readonly="1" invisible="not error_message"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Advanced">
+                            <group>
+                                <field name="batch_size"/>
+                                <field name="timeout"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cartona_config" model="ir.actions.server">
+        <field name="name">Configuration</field>
+        <field name="model_id" ref="model_cartona_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_singleton()</field>
+    </record>
+
+</odoo>

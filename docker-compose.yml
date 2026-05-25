@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: postgres
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+
+  web:
+    image: odoo:18.0
+    depends_on:
+      - db
+    ports:
+      - "8069:8069"
+    volumes:
+      - .:/mnt/extra-addons/cartona_odoo
+      - odoo-web-data:/var/lib/odoo
+      - ./dev/odoo.conf:/etc/odoo/odoo.conf
+      - ./dev/entrypoint.sh:/entrypoint.sh
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+
+volumes:
+  odoo-db-data:
+  odoo-web-data:

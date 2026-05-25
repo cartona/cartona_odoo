@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cartona_dashboard_form" model="ir.ui.view">
+        <field name="name">cartona.config.dashboard</field>
+        <field name="model">cartona.config</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form string="Cartona" create="false" duplicate="false" delete="false">
+                <header>
+                    <button name="action_refresh_dashboard" type="object"
+                            string="Refresh" class="btn-secondary" icon="fa-refresh"/>
+                    <button name="test_connection" type="object"
+                            string="Test Connection" class="btn-primary"/>
+                    <button name="manual_pull_orders" type="object" string="Pull Orders"
+                            invisible="not is_cartona_sync_enabled"/>
+                    <field name="connection_status" widget="statusbar"
+                           statusbar_visible="not_tested,connected,error"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Sync Disabled"
+                            bg_color="text-bg-warning"
+                            invisible="is_cartona_sync_enabled"/>
+                    <div class="oe_title">
+                        <h1>Cartona Integration</h1>
+                    </div>
+                    <group string="Statistics">
+                        <group>
+                            <field name="stat_products_synced" readonly="1"/>
+                            <field name="stat_products_error" readonly="1"/>
+                            <field name="stat_products_pending" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="stat_orders_cartona" readonly="1"/>
+                            <field name="stat_sync_errors_24h" readonly="1"/>
+                            <field name="stat_pending_jobs" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Status">
+                            <field name="is_cartona_sync_enabled" readonly="1"/>
+                            <field name="connection_status" readonly="1"/>
+                            <field name="last_order_pull" readonly="1"/>
+                            <field name="last_sync_date" readonly="1"/>
+                            <field name="error_message" readonly="1" invisible="not error_message"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Product Mapping Failures (24h)" name="product_mapping_issues">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted">
+                                    <field name="dashboard_product_mapping_issue_count" readonly="1" class="oe_inline"/>
+                                    order detail line(s) failed due to missing or unmapped internal product id
+                                </span>
+                                <button name="action_view_product_mapping_issues" type="object"
+                                        string="Open in Log Details" class="btn-link"
+                                        invisible="not dashboard_product_mapping_issue_count"/>
+                            </div>
+                            <field name="dashboard_product_mapping_issue_ids" nolabel="1" readonly="1"
+                                   invisible="not dashboard_product_mapping_issue_count">
+                                <list limit="10" create="false" duplicate="false"
+                                      edit="false" delete="false">
+                                    <field name="sync_log_create_date" string="When"/>
+                                    <field name="cartona_order_number" string="Order #"/>
+                                    <field name="cartona_line_id" string="Detail #"/>
+                                    <field name="internal_product_id"/>
+                                    <field name="error_code"/>
+                                    <field name="message"/>
+                                </list>
+                            </field>
+                            <div class="text-muted" invisible="dashboard_product_mapping_issue_count">
+                                No product mapping failures in the last 24 hours.
+                            </div>
+                        </page>
+                        <page string="Other Order Issues (24h)" name="other_order_issues">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted">
+                                    <field name="dashboard_other_order_issue_count" readonly="1" class="oe_inline"/>
+                                    other order or order line issue(s) in the last 24 hours
+                                </span>
+                                <button name="action_view_other_order_issues" type="object"
+                                        string="Open in Log Details" class="btn-link"
+                                        invisible="not dashboard_other_order_issue_count"/>
+                            </div>
+                            <field name="dashboard_other_order_issue_ids" nolabel="1" readonly="1"
+                                   invisible="not dashboard_other_order_issue_count">
+                                <list limit="10" create="false" duplicate="false"
+                                      edit="false" delete="false">
+                                    <field name="sync_log_create_date" string="When"/>
+                                    <field name="entry_type"/>
+                                    <field name="cartona_order_number" string="Order #"/>
+                                    <field name="cartona_line_id" string="Detail #"/>
+                                    <field name="error_code"/>
+                                    <field name="message"/>
+                                </list>
+                            </field>
+                            <div class="text-muted" invisible="dashboard_other_order_issue_count">
+                                No other order issues in the last 24 hours.
+                            </div>
+                        </page>
+                        <page string="Recent Sync Errors (24h)" name="recent_sync_issues">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted">
+                                    <field name="dashboard_recent_sync_issue_count" readonly="1" class="oe_inline"/>
+                                    sync operation(s) with errors or warnings in the last 24 hours
+                                </span>
+                                <button name="action_view_recent_sync_issues" type="object"
+                                        string="Open in Recent Activity" class="btn-link"
+                                        invisible="not dashboard_recent_sync_issue_count"/>
+                            </div>
+                            <field name="dashboard_recent_sync_issue_ids" nolabel="1" readonly="1"
+                                   invisible="not dashboard_recent_sync_issue_count">
+                                <list limit="10" create="false" duplicate="false"
+                                      edit="false" delete="false">
+                                    <field name="create_date"/>
+                                    <field name="operation_type"/>
+                                    <field name="status"/>
+                                    <field name="detail_count" string="Details"/>
+                                    <field name="message"/>
+                                </list>
+                            </field>
+                            <div class="text-muted" invisible="dashboard_recent_sync_issue_count">
+                                No sync errors or warnings in the last 24 hours.
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cartona_dashboard_window" model="ir.actions.act_window">
+        <field name="name">Cartona</field>
+        <field name="res_model">cartona.config</field>
+        <field name="view_mode">form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_cartona_dashboard_form')}),
+        ]"/>
+        <field name="target">current</field>
+    </record>
+
+    <record id="cartona_embedded_dashboard_overview" model="ir.embedded.actions">
+        <field name="parent_res_model">cartona.config</field>
+        <field name="parent_action_id" ref="action_cartona_dashboard_window"/>
+        <field name="sequence">30</field>
+        <field name="name">Overview</field>
+        <field name="python_method">action_dashboard_overview</field>
+        <field name="default_view_mode">form</field>
+    </record>
+
+    <record id="cartona_embedded_recent_activity" model="ir.embedded.actions">
+        <field name="parent_res_model">cartona.config</field>
+        <field name="parent_action_id" ref="action_cartona_dashboard_window"/>
+        <field name="sequence">10</field>
+        <field name="name">Recent Activity</field>
+        <field name="python_method">action_dashboard_recent_activity</field>
+        <field name="default_view_mode">list</field>
+    </record>
+
+    <record id="cartona_embedded_log_details" model="ir.embedded.actions">
+        <field name="parent_res_model">cartona.config</field>
+        <field name="parent_action_id" ref="action_cartona_dashboard_window"/>
+        <field name="sequence">20</field>
+        <field name="name">Log Details</field>
+        <field name="python_method">action_dashboard_log_details</field>
+        <field name="default_view_mode">list</field>
+    </record>
+
+    <record id="action_cartona_recent_activity" model="ir.actions.server">
+        <field name="name">Recent Activity</field>
+        <field name="model_id" ref="model_cartona_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.search([], limit=1).action_dashboard_recent_activity()</field>
+    </record>
+
+    <record id="action_cartona_log_details" model="ir.actions.server">
+        <field name="name">Log Details</field>
+        <field name="model_id" ref="model_cartona_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.search([], limit=1).action_dashboard_log_details()</field>
+    </record>
+
+    <record id="action_cartona_dashboard" model="ir.actions.server">
+        <field name="name">Cartona Overview</field>
+        <field name="model_id" ref="model_cartona_config"/>
+        <field name="state">code</field>
+        <field name="code">
+config = model.search([], limit=1)
+if config:
+    config._update_sync_stats()
+    action = config.action_dashboard_overview()
+        </field>
+    </record>
+
+    <record id="action_cartona_open" model="ir.actions.server">
+        <field name="name">Cartona</field>
+        <field name="model_id" ref="model_cartona_config"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_dashboard()</field>
+    </record>
+
+</odoo>

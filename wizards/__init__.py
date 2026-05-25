@@ -1,1 +1,1 @@
-from . import marketplace_delivery_otp_wizard
+from . import cartona_delivery_otp_wizard

@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cartona_sync_log_list" model="ir.ui.view">
+        <field name="name">cartona.sync.log.list</field>
+        <field name="model">cartona.sync.log</field>
+        <field name="arch" type="xml">
+            <list string="Recent Activity" create="false" duplicate="false" edit="false" delete="false">
+                <field name="create_date"/>
+                <field name="operation_type"/>
+                <field name="status"/>
+                <field name="action_type" optional="show"/>
+                <field name="detail_count" string="Details"/>
+                <field name="record_name"/>
+                <field name="message"/>
+                <field name="duration" optional="hide"/>
+                <field name="user_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cartona_sync_log_form" model="ir.ui.view">
+        <field name="name">cartona.sync.log.form</field>
+        <field name="model">cartona.sync.log</field>
+        <field name="arch" type="xml">
+            <form string="Sync Log" create="false" duplicate="false" edit="false" delete="false">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_detail_lines" type="object"
+                                class="oe_stat_button" icon="fa-list"
+                                invisible="not detail_count">
+                            <field name="detail_count" widget="statinfo" string="Details"/>
+                        </button>
+                        <button name="action_view_record" type="object"
+                                class="oe_stat_button" icon="fa-external-link"
+                                invisible="not record_id">
+                            <field name="record_name" widget="statinfo" string="Related Record"/>
+                        </button>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="operation_type" readonly="1"/>
+                            <field name="status" readonly="1"/>
+                            <field name="action_type" readonly="1"/>
+                            <field name="cartona_config_id" readonly="1"/>
+                            <field name="create_date" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="records_processed" readonly="1"/>
+                            <field name="records_success" readonly="1"/>
+                            <field name="records_error" readonly="1"/>
+                            <field name="detail_count" readonly="1"/>
+                            <field name="duration" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="message" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Details" name="details">
+                            <div class="mb-2">
+                                <button name="action_view_detail_lines" type="object"
+                                        string="Search Details" class="btn-secondary" icon="fa-search"/>
+                            </div>
+                            <field name="line_ids" nolabel="1" readonly="1">
+                                <list string="Sync Log Details" create="false" duplicate="false"
+                                      edit="false" delete="false">
+                                    <field name="status"/>
+                                    <field name="entry_type"/>
+                                    <field name="cartona_order_number" optional="show"/>
+                                    <field name="cartona_line_id" optional="show"/>
+                                    <field name="internal_product_id" optional="show"/>
+                                    <field name="record_name" optional="show"/>
+                                    <field name="error_code" optional="show"/>
+                                    <field name="message"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Error Summary" name="errors" invisible="not error_details">
+                            <field name="error_details" nolabel="1" readonly="1"/>
+                        </page>
+                        <page string="Request / Response" name="api_payload"
+                              invisible="not request_data and not response_data">
+                            <group>
+                                <field name="request_data" readonly="1" widget="text"/>
+                                <field name="response_data" readonly="1" widget="text"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cartona_sync_log_line_list" model="ir.ui.view">
+        <field name="name">cartona.sync.log.line.list</field>
+        <field name="model">cartona.sync.log.line</field>
+        <field name="arch" type="xml">
+            <list string="Log Details" create="false" duplicate="false"
+                  edit="false" delete="false">
+                <field name="status"/>
+                <field name="entry_type"/>
+                <field name="cartona_order_number" string="Cartona Order #" optional="show"/>
+                <field name="cartona_line_id" string="Cartona Order Detail #" optional="show"/>
+                <field name="internal_product_id"/>
+                <field name="record_name" optional="show"/>
+                <field name="error_code" optional="show"/>
+                <field name="message"/>
+                <field name="sync_log_id" optional="hide"/>
+                <field name="sync_log_create_date" optional="hide"/>
+                <field name="sync_log_operation" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cartona_sync_log_line_search" model="ir.ui.view">
+        <field name="name">cartona.sync.log.line.search</field>
+        <field name="model">cartona.sync.log.line</field>
+        <field name="arch" type="xml">
+            <search string="Search Details">
+                <field name="cartona_order_number" string="Cartona Order #"/>
+                <field name="cartona_line_id" string="Cartona Order Detail #"/>
+                <field name="internal_product_id"/>
+                <field name="record_name"/>
+                <field name="message"/>
+                <field name="status"/>
+                <field name="entry_type"/>
+                <field name="error_code"/>
+                <field name="sync_log_operation" string="Operation"/>
+                <field name="sync_log_id"/>
+                <separator/>
+                <filter name="filter_product" string="Products"
+                        domain="[('entry_type', '=', 'product')]"/>
+                <filter name="filter_error" string="Errors"
+                        domain="[('status', '=', 'error')]"/>
+                <filter name="filter_warning" string="Warnings"
+                        domain="[('status', '=', 'warning')]"/>
+                <filter name="filter_order_line" string="Order Lines"
+                        domain="[('entry_type', '=', 'order_line')]"/>
+                <filter name="filter_product_mapping" string="Product Mapping"
+                        domain="[('error_code', 'in', ['missing_internal_product_id', 'invalid_internal_product_id', 'variant_not_found', 'variant_not_available'])]"/>
+                <filter name="filter_order" string="Orders"
+                        domain="[('entry_type', '=', 'order')]"/>
+                <filter name="filter_system" string="System"
+                        domain="[('entry_type', '=', 'system')]"/>
+                <filter name="filter_info" string="Info"
+                        domain="[('status', '=', 'info')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_entry_type" string="Entry Type"
+                            context="{'group_by': 'entry_type'}"/>
+                    <filter name="group_order" string="Cartona Order #"
+                            context="{'group_by': 'cartona_order_number'}"/>
+                    <filter name="group_status" string="Status"
+                            context="{'group_by': 'status'}"/>
+                    <filter name="group_error_code" string="Error Code"
+                            context="{'group_by': 'error_code'}"/>
+                    <filter name="group_operation" string="Operation"
+                            context="{'group_by': 'sync_log_operation'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_cartona_sync_log_line_form" model="ir.ui.view">
+        <field name="name">cartona.sync.log.line.form</field>
+        <field name="model">cartona.sync.log.line</field>
+        <field name="arch" type="xml">
+            <form string="Sync Log Detail" create="false" duplicate="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="status" readonly="1"/>
+                            <field name="entry_type" readonly="1"/>
+                            <field name="error_code" readonly="1"/>
+                            <field name="sync_log_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="cartona_order_number" readonly="1"
+                                   invisible="not cartona_order_number"/>
+                            <field name="cartona_line_id" readonly="1"
+                                   invisible="entry_type != 'order_line'"/>
+                            <field name="internal_product_id" readonly="1"
+                                   invisible="entry_type not in ('order_line', 'product')"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="message" readonly="1"/>
+                        <field name="record_name" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Request / Response" name="api_payload"
+                              invisible="not request_data and not response_data">
+                            <group>
+                                <field name="request_data" readonly="1" widget="text"/>
+                                <field name="response_data" readonly="1" widget="text"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cartona_sync_log_search" model="ir.ui.view">
+        <field name="name">cartona.sync.log.search</field>
+        <field name="model">cartona.sync.log</field>
+        <field name="arch" type="xml">
+            <search string="Sync Logs">
+                <field name="operation_type"/>
+                <field name="status"/>
+                <field name="message"/>
+                <field name="record_name"/>
+                <field name="action_type"/>
+                <field name="line_ids" string="Cartona Order #"
+                       filter_domain="[('line_ids.cartona_order_number', 'ilike', self)]"/>
+                <field name="line_ids" string="Cartona Order Detail #"
+                       filter_domain="[('line_ids.cartona_line_id', 'ilike', self)]"/>
+                <field name="line_ids" string="Detail Message"
+                       filter_domain="[('line_ids.message', 'ilike', self)]"/>
+                <separator/>
+                <filter name="filter_success" string="Success" domain="[('status', '=', 'success')]"/>
+                <filter name="filter_error" string="Error" domain="[('status', '=', 'error')]"/>
+                <filter name="filter_warning" string="Warning" domain="[('status', '=', 'warning')]"/>
+                <filter name="filter_info" string="Info" domain="[('status', '=', 'info')]"/>
+                <separator/>
+                <filter name="filter_product_sync" string="Product Sync"
+                        domain="[('operation_type', '=', 'product_sync')]"/>
+                <filter name="filter_order_pull" string="Order Pull"
+                        domain="[('operation_type', '=', 'order_pull')]"/>
+                <filter name="filter_status_sync" string="Status Sync"
+                        domain="[('operation_type', '=', 'status_sync')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_operation" string="Operation" context="{'group_by': 'operation_type'}"/>
+                    <filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
+                    <filter name="group_action_type" string="Action Type" context="{'group_by': 'action_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

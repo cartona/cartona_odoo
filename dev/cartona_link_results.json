@@ -1,0 +1,306 @@
+{
+  "ok": 0,
+  "fail": 50,
+  "results": [
+    {
+      "ps_id": 2885653,
+      "variant_id": 51,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=51"
+    },
+    {
+      "ps_id": 2885607,
+      "variant_id": 52,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=52"
+    },
+    {
+      "ps_id": 2885606,
+      "variant_id": 53,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=53"
+    },
+    {
+      "ps_id": 2885605,
+      "variant_id": 54,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=54"
+    },
+    {
+      "ps_id": 2884012,
+      "variant_id": 55,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=55"
+    },
+    {
+      "ps_id": 2884007,
+      "variant_id": 56,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=56"
+    },
+    {
+      "ps_id": 2884006,
+      "variant_id": 57,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=57"
+    },
+    {
+      "ps_id": 2882292,
+      "variant_id": 58,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=58"
+    },
+    {
+      "ps_id": 2882291,
+      "variant_id": 59,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=59"
+    },
+    {
+      "ps_id": 2882290,
+      "variant_id": 60,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=60"
+    },
+    {
+      "ps_id": 2882287,
+      "variant_id": 61,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=61"
+    },
+    {
+      "ps_id": 2882286,
+      "variant_id": 62,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=62"
+    },
+    {
+      "ps_id": 2882283,
+      "variant_id": 63,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=63"
+    },
+    {
+      "ps_id": 2882282,
+      "variant_id": 64,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=64"
+    },
+    {
+      "ps_id": 2882281,
+      "variant_id": 65,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=65"
+    },
+    {
+      "ps_id": 2882280,
+      "variant_id": 66,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=66"
+    },
+    {
+      "ps_id": 2882279,
+      "variant_id": 67,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=67"
+    },
+    {
+      "ps_id": 2882276,
+      "variant_id": 68,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=68"
+    },
+    {
+      "ps_id": 2882270,
+      "variant_id": 69,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=69"
+    },
+    {
+      "ps_id": 2882266,
+      "variant_id": 70,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=70"
+    },
+    {
+      "ps_id": 2882264,
+      "variant_id": 71,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=71"
+    },
+    {
+      "ps_id": 2880387,
+      "variant_id": 72,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=72"
+    },
+    {
+      "ps_id": 2880386,
+      "variant_id": 73,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=73"
+    },
+    {
+      "ps_id": 2880375,
+      "variant_id": 74,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=74"
+    },
+    {
+      "ps_id": 2880374,
+      "variant_id": 75,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=75"
+    },
+    {
+      "ps_id": 2880371,
+      "variant_id": 76,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=76"
+    },
+    {
+      "ps_id": 2880370,
+      "variant_id": 77,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=77"
+    },
+    {
+      "ps_id": 2880369,
+      "variant_id": 78,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=78"
+    },
+    {
+      "ps_id": 2880318,
+      "variant_id": 79,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=79"
+    },
+    {
+      "ps_id": 2880316,
+      "variant_id": 80,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=80"
+    },
+    {
+      "ps_id": 2880313,
+      "variant_id": 81,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=81"
+    },
+    {
+      "ps_id": 2880309,
+      "variant_id": 82,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=82"
+    },
+    {
+      "ps_id": 2880306,
+      "variant_id": 83,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=83"
+    },
+    {
+      "ps_id": 2880255,
+      "variant_id": 84,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=84"
+    },
+    {
+      "ps_id": 2880104,
+      "variant_id": 85,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=85"
+    },
+    {
+      "ps_id": 2880102,
+      "variant_id": 86,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=86"
+    },
+    {
+      "ps_id": 2880101,
+      "variant_id": 87,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=87"
+    },
+    {
+      "ps_id": 2880100,
+      "variant_id": 88,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=88"
+    },
+    {
+      "ps_id": 2880050,
+      "variant_id": 89,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=89"
+    },
+    {
+      "ps_id": 2879933,
+      "variant_id": 90,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=90"
+    },
+    {
+      "ps_id": 2879931,
+      "variant_id": 91,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=91"
+    },
+    {
+      "ps_id": 2879927,
+      "variant_id": 92,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=92"
+    },
+    {
+      "ps_id": 2879926,
+      "variant_id": 93,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=93"
+    },
+    {
+      "ps_id": 2879925,
+      "variant_id": 94,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=94"
+    },
+    {
+      "ps_id": 2879924,
+      "variant_id": 95,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=95"
+    },
+    {
+      "ps_id": 2879923,
+      "variant_id": 96,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=96"
+    },
+    {
+      "ps_id": 2879922,
+      "variant_id": 97,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=97"
+    },
+    {
+      "ps_id": 2879921,
+      "variant_id": 98,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=98"
+    },
+    {
+      "ps_id": 2879920,
+      "variant_id": 99,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=99"
+    },
+    {
+      "ps_id": 2879919,
+      "variant_id": 100,
+      "ok": false,
+      "error": "400 Client Error: Bad Request for url: https://supplier-integrations.cartona.space/api/v1/supplier-product?internal_product_id=100"
+    }
+  ]
+}

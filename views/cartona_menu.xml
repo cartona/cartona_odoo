@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_cartona_root"
+              name="Cartona"
+              action="action_cartona_open"
+              sequence="50"/>
+
+    <menuitem id="menu_cartona_dashboard"
+              name="Overview"
+              parent="menu_cartona_root"
+              action="action_cartona_dashboard"
+              sequence="5"/>
+
+    <menuitem id="menu_cartona_recent_activity"
+              name="Recent Activity"
+              parent="menu_cartona_root"
+              action="action_cartona_recent_activity"
+              sequence="6"/>
+
+    <menuitem id="menu_cartona_log_details"
+              name="Log Details"
+              parent="menu_cartona_root"
+              action="action_cartona_log_details"
+              sequence="7"/>
+
+    <menuitem id="menu_cartona_config"
+              name="Configuration"
+              parent="menu_cartona_root"
+              action="action_cartona_config"
+              sequence="10"/>
+
+</odoo>
