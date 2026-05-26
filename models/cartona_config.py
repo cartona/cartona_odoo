@@ -37,6 +37,13 @@ class CartonaConfig(models.Model):
     _description = 'Cartona Integration Configuration'
     _rec_name = 'name'
     _order = 'sequence, name'
+    _sql_constraints = [
+        (
+            'company_uniq',
+            'unique(company_id)',
+            'Only one Cartona configuration is allowed per company.',
+        ),
+    ]
 
     name = fields.Char(default='Cartona', required=True)
     sequence = fields.Integer(default=10)
@@ -50,7 +57,7 @@ class CartonaConfig(models.Model):
         required=True,
         default='https://supplier-integrations.cartona.com/api/v1/',
     )
-    auth_token = fields.Char(required=True)
+    auth_token = fields.Char(required=True, groups='cartona_odoo.group_cartona_manager')
     is_cartona_sync_enabled = fields.Boolean(
         string='Enable Cartona Sync',
         default=False,
@@ -141,17 +148,109 @@ class CartonaConfig(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        if self.search([]):
-            raise ValidationError(_(
-                'Only one Cartona configuration is allowed. Edit the existing record instead.'
-            ))
         return super().create(vals_list)
 
     def copy(self, default=None):
         raise UserError(_('Cartona configuration cannot be duplicated.'))
 
     def unlink(self):
-        raise UserError(_('Cartona configuration cannot be deleted.'))
+        manager_group = self.env.ref(
+            'cartona_odoo.group_cartona_manager', raise_if_not_found=False,
+        )
+        if not manager_group or manager_group not in self.env.user.groups_id:
+            raise UserError(_('Cartona configuration cannot be deleted.'))
+        for config in self:
+            if self.env['sale.order'].search_count([
+                ('cartona_config_id', '=', config.id),
+            ]):
+                raise UserError(_(
+                    'Cannot delete Cartona configuration for %s: '
+                    'Cartona orders are still linked to it.',
+                ) % config.company_id.display_name)
+        return super().unlink()
+
+    @api.model
+    def get_for_company(self, company=None):
+        company = company or self.env.company
+        return self.search([('company_id', '=', company.id)], limit=1)
+
+    @api.model
+    def require_for_company(self, company=None):
+        company = company or self.env.company
+        config = self.get_for_company(company)
+        if not config:
+            raise UserError(_(
+                'No Cartona configuration for company %s.',
+            ) % company.display_name)
+        return config
+
+    def _config_form_view_id(self):
+        return self.env.ref('cartona_odoo.view_cartona_config_form').id
+
+    @api.model
+    def action_open_for_company(self):
+        company = self.env.company
+        config = self.get_for_company(company)
+        action = {
+            'type': 'ir.actions.act_window',
+            'name': _('Cartona Configuration'),
+            'res_model': 'cartona.config',
+            'view_mode': 'form',
+            'views': [(self._config_form_view_id(), 'form')],
+            'target': 'current',
+        }
+        if config:
+            action['res_id'] = config.id
+        else:
+            action['context'] = {
+                'default_company_id': company.id,
+                'default_name': company.name,
+            }
+        return action
+
+    @api.model
+    def action_dashboard_for_company(self):
+        config = self.get_for_company()
+        if not config:
+            return self.action_open_for_company()
+        config._update_sync_stats()
+        return config.action_dashboard_overview()
+
+    @api.model
+    def action_recent_activity_for_company(self):
+        config = self.get_for_company()
+        if not config:
+            return self.action_open_for_company()
+        return config.action_dashboard_recent_activity()
+
+    @api.model
+    def action_log_details_for_company(self):
+        config = self.get_for_company()
+        if not config:
+            return self.action_open_for_company()
+        return config.action_dashboard_log_details()
+
+    def _cartona_pending_jobs_domain(self):
+        return [
+            ('state', 'in', ['pending', 'enqueued', 'started', 'wait_dependencies']),
+            '|', ('channel', 'ilike', 'cartona'), ('name', 'ilike', 'Cartona'),
+        ]
+
+    def _filter_cartona_jobs_for_company(self, jobs):
+        self.ensure_one()
+        company = self.company_id
+        allowed = self.env['queue.job']
+        for job in jobs:
+            records = job.records
+            if not records:
+                continue
+            if all(
+                not getattr(record, 'company_id', False)
+                or record.company_id in (False, company)
+                for record in records
+            ):
+                allowed |= job
+        return allowed
 
     def get_api_headers(self):
         self.ensure_one()
@@ -169,12 +268,37 @@ class CartonaConfig(models.Model):
         self.ensure_one()
         return dict(CARTONA_STATE_MAPPING)
 
-    def _dashboard_company_product_domain(self, extra=None):
+    def _dashboard_sync_domain(self, extra=None):
         self.ensure_one()
-        domain = [('company_id', '=', self.company_id.id)]
+        domain = [('cartona_config_id', '=', self.id)]
         if extra:
             domain.extend(extra)
         return domain
+
+    def _dashboard_eligible_product_domain(self):
+        self.ensure_one()
+        return [
+            ('sale_ok', '=', True),
+            ('company_id', 'in', [False, self.company_id.id]),
+        ]
+
+    def _count_pending_variants(self):
+        self.ensure_one()
+        sync_model = self.env['cartona.product.sync']
+        pivot_pending = sync_model.search_count(
+            self._dashboard_sync_domain([
+                ('sync_status', 'in', ['not_synced', 'syncing']),
+            ]),
+        )
+        has_pivot_product_ids = sync_model.search(
+            self._dashboard_sync_domain(),
+        ).mapped('product_id').ids
+        no_row_pending = self.env['product.product'].search_count(
+            self._dashboard_eligible_product_domain() + [
+                ('id', 'not in', has_pivot_product_ids),
+            ],
+        )
+        return pivot_pending + no_row_pending
 
     @api.depends(
         'is_cartona_sync_enabled', 'connection_status', 'last_order_pull',
@@ -183,21 +307,18 @@ class CartonaConfig(models.Model):
     )
     def _compute_dashboard_stats(self):
         log_model = self.env['cartona.sync.log']
-        product_model = self.env['product.product']
+        sync_model = self.env['cartona.product.sync']
         order_model = self.env['sale.order']
         job_model = self.env['queue.job']
         since = fields.Datetime.now() - timedelta(hours=24)
         for config in self:
-            product_domain = config._dashboard_company_product_domain()
-            config.stat_products_synced = product_model.search_count(
-                product_domain + [('cartona_sync_status', '=', 'synced')],
+            config.stat_products_synced = sync_model.search_count(
+                config._dashboard_sync_domain([('sync_status', '=', 'synced')]),
             )
-            config.stat_products_error = product_model.search_count(
-                product_domain + [('cartona_sync_status', '=', 'error')],
+            config.stat_products_error = sync_model.search_count(
+                config._dashboard_sync_domain([('sync_status', '=', 'error')]),
             )
-            config.stat_products_pending = product_model.search_count(
-                product_domain + [('cartona_sync_status', 'in', ['not_synced', 'syncing'])],
-            )
+            config.stat_products_pending = config._count_pending_variants()
             config.stat_orders_cartona = order_model.search_count([
                 ('is_cartona_order', '=', True),
                 ('cartona_config_id', '=', config.id),
@@ -207,10 +328,11 @@ class CartonaConfig(models.Model):
                 ('status', 'in', ['error', 'warning']),
                 ('create_date', '>=', since),
             ])
-            config.stat_pending_jobs = job_model.search_count([
-                ('state', 'in', ['pending', 'enqueued', 'started', 'wait_dependencies']),
-                '|', ('channel', 'ilike', 'cartona'), ('name', 'ilike', 'Cartona'),
-            ])
+            config.stat_pending_jobs = len(
+                config._filter_cartona_jobs_for_company(
+                    job_model.search(config._cartona_pending_jobs_domain()),
+                ),
+            )
 
     @api.depends(
         'dashboard_product_mapping_issue_ids',
@@ -436,46 +558,42 @@ class CartonaConfig(models.Model):
 
     @api.model
     def action_open_dashboard(self):
-        config = self.search([], limit=1)
-        if not config:
-            raise UserError(_('Cartona configuration not found. Reinstall the module.'))
-        config._update_sync_stats()
-        return config.action_dashboard_overview()
+        return self.action_dashboard_for_company()
 
     def action_view_products_synced(self):
-        return self._action_view_products_by_status('synced')
+        return self._action_view_sync_by_status('synced')
 
     def action_view_products_error(self):
-        return self._action_view_products_by_status('error')
+        return self._action_view_sync_by_status('error')
 
     def action_view_products_pending(self):
-        self.ensure_one()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Pending Variants'),
-            'res_model': 'product.product',
-            'view_mode': 'list,form',
-            'domain': self._dashboard_company_product_domain([
-                ('cartona_sync_status', 'in', ['not_synced', 'syncing']),
-            ]),
-        }
+        return self._action_view_sync_by_status(['not_synced', 'syncing'])
 
-    def _action_view_products_by_status(self, status):
+    def _action_view_sync_by_status(self, status):
         self.ensure_one()
-        names = {
-            'synced': _('Synced Variants'),
-            'error': _('Variants With Sync Errors'),
-            'not_synced': _('Unsynced Variants'),
-            'syncing': _('Variants Syncing'),
-        }
+        if isinstance(status, (list, tuple)):
+            status_filter = ('sync_status', 'in', list(status))
+            name = _('Pending Variants')
+        else:
+            status_filter = ('sync_status', '=', status)
+            names = {
+                'synced': _('Synced Variants'),
+                'error': _('Variants With Sync Errors'),
+                'not_synced': _('Unsynced Variants'),
+                'syncing': _('Variants Syncing'),
+            }
+            name = names.get(status, _('Variants'))
         return {
             'type': 'ir.actions.act_window',
-            'name': names.get(status, _('Variants')),
-            'res_model': 'product.product',
+            'name': name,
+            'res_model': 'cartona.product.sync',
             'view_mode': 'list,form',
-            'domain': self._dashboard_company_product_domain([
-                ('cartona_sync_status', '=', status),
-            ]),
+            'views': [
+                (self.env.ref('cartona_odoo.view_cartona_product_sync_list').id, 'list'),
+                (self.env.ref('cartona_odoo.view_cartona_product_sync_form').id, 'form'),
+            ],
+            'domain': self._dashboard_sync_domain([status_filter]),
+            'context': {'default_cartona_config_id': self.id},
         }
 
     def action_view_sync_errors_24h(self):
@@ -499,16 +617,19 @@ class CartonaConfig(models.Model):
 
     def action_view_pending_jobs(self):
         self.ensure_one()
+        jobs = self._filter_cartona_jobs_for_company(
+            self.env['queue.job'].search(self._cartona_pending_jobs_domain()),
+        )
         return {
             'type': 'ir.actions.act_window',
             'name': _('Cartona Queue Jobs'),
             'res_model': 'queue.job',
             'view_mode': 'list,form',
-            'domain': [
-                ('state', 'in', ['pending', 'enqueued', 'started', 'wait_dependencies']),
-                '|', ('channel', 'ilike', 'cartona'), ('name', 'ilike', 'Cartona'),
-            ],
+            'domain': [('id', 'in', jobs.ids)],
         }
+
+    def action_open_singleton(self):
+        return self.action_open_for_company()
 
     def test_connection(self):
         self.ensure_one()
@@ -583,7 +704,7 @@ class CartonaConfig(models.Model):
         self.ensure_one()
         if not self.is_cartona_sync_enabled:
             raise UserError(_('Enable Cartona sync on configuration first.'))
-        api = self.env['cartona.api'].with_context(
+        api = self.env['cartona.api'].with_company(self.company_id).with_context(
             cartona_config_id=self.id,
             cartona_log_action_type='manual',
         )
@@ -601,16 +722,7 @@ class CartonaConfig(models.Model):
         }
 
     def action_view_synced_variants(self):
-        self.ensure_one()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Synced Variants'),
-            'res_model': 'product.product',
-            'view_mode': 'list,form',
-            'domain': self._dashboard_company_product_domain([
-                ('cartona_sync_status', '=', 'synced'),
-            ]),
-        }
+        return self._action_view_sync_by_status('synced')
 
     def action_view_cartona_orders(self):
         self.ensure_one()
@@ -629,27 +741,12 @@ class CartonaConfig(models.Model):
         self.ensure_one()
         return self.action_dashboard_recent_activity()
 
-    def action_open_singleton(self):
-        config = self[:1] or self.search([], limit=1)
-        if not config:
-            raise UserError(_('Cartona configuration not found. Reinstall the module.'))
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Cartona Configuration'),
-            'res_model': 'cartona.config',
-            'view_mode': 'form',
-            'views': [(self.env.ref('cartona_odoo.view_cartona_config_form').id, 'form')],
-            'res_id': config.id,
-            'target': 'current',
-        }
-
     def _update_sync_stats(self):
         self.ensure_one()
-        product_domain = self._dashboard_company_product_domain([
-            ('cartona_sync_status', '=', 'synced'),
-        ])
         self.write({
-            'total_products_synced': self.env['product.product'].search_count(product_domain),
+            'total_products_synced': self.env['cartona.product.sync'].search_count(
+                self._dashboard_sync_domain([('sync_status', '=', 'synced')]),
+            ),
             'total_orders_pulled': self.env['sale.order'].search_count([
                 ('is_cartona_order', '=', True),
                 ('cartona_config_id', '=', self.id),

@@ -1,6 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_cartona_config_user,cartona.config.user,model_cartona_config,base.group_user,1,0,0,0
-access_cartona_config_manager,cartona.config.manager,model_cartona_config,base.group_system,1,1,0,0
+access_cartona_config_manager,cartona.config.manager,model_cartona_config,base.group_system,1,1,1,1
 access_cartona_api_user,cartona.api.user,model_cartona_api,base.group_user,1,0,0,0
 access_cartona_api_manager,cartona.api.manager,model_cartona_api,base.group_system,1,1,1,1
 access_cartona_sync_log_user,cartona.sync.log.user,model_cartona_sync_log,base.group_user,1,0,0,0
@@ -11,7 +11,7 @@ access_cartona_order_processor_user,cartona.order.processor.user,model_cartona_o
 access_cartona_order_processor_manager,cartona.order.processor.manager,model_cartona_order_processor,base.group_system,1,1,1,1
 access_cartona_delivery_otp_wizard_user,cartona.delivery.otp.wizard.user,model_cartona_delivery_otp_wizard,base.group_user,1,1,1,1
 access_cartona_config_cartona_user,cartona.config.cartona.user,model_cartona_config,group_cartona_user,1,0,0,0
-access_cartona_config_cartona_manager,cartona.config.cartona.manager,model_cartona_config,group_cartona_manager,1,1,0,0
+access_cartona_config_cartona_manager,cartona.config.cartona.manager,model_cartona_config,group_cartona_manager,1,1,1,0
 access_cartona_api_cartona_user,cartona.api.cartona.user,model_cartona_api,group_cartona_user,1,0,0,0
 access_cartona_api_cartona_manager,cartona.api.cartona.manager,model_cartona_api,group_cartona_manager,1,1,1,1
 access_cartona_sync_log_cartona_user,cartona.sync.log.cartona.user,model_cartona_sync_log,group_cartona_user,1,0,0,0
@@ -20,3 +20,7 @@ access_cartona_sync_log_line_cartona_user,cartona.sync.log.line.cartona.user,mod
 access_cartona_sync_log_line_cartona_manager,cartona.sync.log.line.cartona.manager,model_cartona_sync_log_line,group_cartona_manager,1,0,0,0
 access_cartona_order_processor_cartona_user,cartona.order.processor.cartona.user,model_cartona_order_processor,group_cartona_user,1,0,0,0
 access_cartona_order_processor_cartona_manager,cartona.order.processor.cartona.manager,model_cartona_order_processor,group_cartona_manager,1,1,1,1
+access_cartona_product_sync_user,cartona.product.sync.user,model_cartona_product_sync,base.group_user,1,0,0,0
+access_cartona_product_sync_manager,cartona.product.sync.manager,model_cartona_product_sync,base.group_system,1,1,1,1
+access_cartona_product_sync_cartona_user,cartona.product.sync.cartona.user,model_cartona_product_sync,group_cartona_user,1,0,0,0
+access_cartona_product_sync_cartona_manager,cartona.product.sync.cartona.manager,model_cartona_product_sync,group_cartona_manager,1,1,1,1

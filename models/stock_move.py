@@ -1,8 +1,6 @@
 from odoo import models
 import logging
 
-from .cartona_mixin import cartona_sync_enabled
-
 _logger = logging.getLogger(__name__)
 
 
@@ -11,7 +9,7 @@ class StockMove(models.Model):
 
     def _action_done(self, cancel_backorder=False):
         result = super()._action_done(cancel_backorder)
-        if not self.env.context.get('skip_cartona_sync') and cartona_sync_enabled(self.env):
+        if not self.env.context.get('skip_cartona_sync'):
             products = self.mapped('product_id')
             if products:
                 products._trigger_cartona_sync('stock')
@@ -24,10 +22,9 @@ class StockQuant(models.Model):
     def write(self, vals):
         result = super().write(vals)
         if 'quantity' in vals and not self.env.context.get('skip_cartona_sync'):
-            if cartona_sync_enabled(self.env):
-                products = self.mapped('product_id')
-                if products:
-                    products._trigger_cartona_sync('stock')
+            products = self.mapped('product_id')
+            if products:
+                products._trigger_cartona_sync('stock')
         return result
 
 
@@ -68,16 +65,20 @@ class StockPicking(models.Model):
             self.env.context.get('skip_cartona_sync')
             or self.env.context.get('skip_cartona_delivery_sync')
         )
-        if not skip_sync and cartona_sync_enabled(self.env):
+        if not skip_sync:
             for picking in self:
+                order = picking.sale_id
                 if (picking.picking_type_code == 'outgoing'
                         and picking.state == 'done'
-                        and picking.sale_id
-                        and picking.sale_id.cartona_id
-                        and picking.sale_id.cartona_config_id
-                        and picking.sale_id.delivered_by == 'delivered_by_supplier'):
-                    picking.sale_id.with_delay(
+                        and order
+                        and order.cartona_id
+                        and order.cartona_config_id
+                        and order.cartona_config_id.is_cartona_sync_enabled
+                        and order.delivered_by == 'delivered_by_supplier'):
+                    order.with_context(
+                        cartona_config_id=order.cartona_config_id.id,
+                    ).with_delay(
                         channel='cartona',
-                        description=f'Sync delivery validation for order {picking.sale_id.name}',
+                        description=f'Sync delivery validation for order {order.name}',
                     )._sync_delivery_validation_to_cartona()
         return result

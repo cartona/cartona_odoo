@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cartona_product_sync_list" model="ir.ui.view">
+        <field name="name">cartona.product.sync.list</field>
+        <field name="model">cartona.product.sync</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="product_id"/>
+                <field name="cartona_config_id"/>
+                <field name="company_id"/>
+                <field name="sync_status"/>
+                <field name="sync_date"/>
+                <field name="sync_error"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cartona_product_sync_form" model="ir.ui.view">
+        <field name="name">cartona.product.sync.form</field>
+        <field name="model">cartona.product.sync</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="product_id"/>
+                        <field name="cartona_config_id"/>
+                        <field name="company_id"/>
+                        <field name="sync_status"/>
+                        <field name="sync_date"/>
+                        <field name="sync_error"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cartona_product_sync_search" model="ir.ui.view">
+        <field name="name">cartona.product.sync.search</field>
+        <field name="model">cartona.product.sync</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="product_id"/>
+                <field name="cartona_config_id"/>
+                <field name="company_id"/>
+                <filter name="filter_synced" string="Synced"
+                        domain="[('sync_status', '=', 'synced')]"/>
+                <filter name="filter_error" string="Error"
+                        domain="[('sync_status', '=', 'error')]"/>
+                <filter name="filter_pending" string="Pending"
+                        domain="[('sync_status', 'in', ['not_synced', 'syncing'])]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_status" string="Status"
+                            context="{'group_by': 'sync_status'}"/>
+                    <filter name="group_config" string="Configuration"
+                            context="{'group_by': 'cartona_config_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

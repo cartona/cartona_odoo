@@ -170,26 +170,21 @@
         <field name="name">Recent Activity</field>
         <field name="model_id" ref="model_cartona_config"/>
         <field name="state">code</field>
-        <field name="code">action = model.search([], limit=1).action_dashboard_recent_activity()</field>
+        <field name="code">action = model.action_recent_activity_for_company()</field>
     </record>
 
     <record id="action_cartona_log_details" model="ir.actions.server">
         <field name="name">Log Details</field>
         <field name="model_id" ref="model_cartona_config"/>
         <field name="state">code</field>
-        <field name="code">action = model.search([], limit=1).action_dashboard_log_details()</field>
+        <field name="code">action = model.action_log_details_for_company()</field>
     </record>
 
     <record id="action_cartona_dashboard" model="ir.actions.server">
         <field name="name">Cartona Overview</field>
         <field name="model_id" ref="model_cartona_config"/>
         <field name="state">code</field>
-        <field name="code">
-config = model.search([], limit=1)
-if config:
-    config._update_sync_stats()
-    action = config.action_dashboard_overview()
-        </field>
+        <field name="code">action = model.action_dashboard_for_company()</field>
     </record>
 
     <record id="action_cartona_open" model="ir.actions.server">

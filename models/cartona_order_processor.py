@@ -107,7 +107,7 @@ class CartonaOrderProcessor(models.Model):
             if not validated_order:
                 return self._make_result(False, order_data=order_data, issues=issues)
 
-            existing_order = self._find_existing_order(validated_order['order_id'])
+            existing_order = self._find_existing_order(validated_order['order_id'], config)
             if existing_order:
                 cartona_status = validated_order.get('status', 'pending')
                 new_odoo_state = self._map_cartona_state_to_odoo(cartona_status, config)
@@ -335,8 +335,11 @@ class CartonaOrderProcessor(models.Model):
             'comment': item_data.get('comment'),
         }, None
 
-    def _find_existing_order(self, order_id):
-        return self.env['sale.order'].search([('cartona_id', '=', order_id)], limit=1)
+    def _find_existing_order(self, order_id, config):
+        return self.env['sale.order'].search([
+            ('cartona_id', '=', order_id),
+            ('cartona_config_id', '=', config.id),
+        ], limit=1)
 
     def _map_cartona_state_to_odoo(self, cartona_status, config=None):
         if not config:
@@ -540,7 +543,9 @@ class CartonaOrderProcessor(models.Model):
         lines_created = 0
         order_label = order.cartona_order_number or order.cartona_id
         for item_data in items_data:
-            product, error_code, error_message = self._resolve_variant(item_data)
+            product, error_code, error_message = self._resolve_variant(
+                item_data, config=order.cartona_config_id,
+            )
             if not product:
                 line_id = item_data.get('cartona_line_id') or '?'
                 internal_product_id = item_data.get('internal_product_id')
@@ -576,14 +581,16 @@ class CartonaOrderProcessor(models.Model):
 
     def _find_or_create_customer(self, customer_data, config):
         try:
-            return self.env['res.partner'].find_or_create_cartona_customer(
-                customer_data, config,
-            )
+            return self.env['res.partner'].with_company(
+                config.company_id,
+            ).find_or_create_cartona_customer(customer_data, config)
         except Exception as err:
             _logger.error('Error finding/creating customer: %s', err)
             return None
 
-    def _resolve_variant(self, item_data):
+    def _resolve_variant(self, item_data, config=None):
+        if not config:
+            config = self._get_cartona_config()
         internal_product_id = item_data.get('internal_product_id')
         if not internal_product_id:
             return None, 'missing_internal_product_id', _(
@@ -604,5 +611,9 @@ class CartonaOrderProcessor(models.Model):
         if not variant.active or not variant.sale_ok:
             return None, 'variant_not_available', _(
                 'Odoo variant %(value)s exists but is inactive or not for sale'
+            ) % {'value': internal_product_id}
+        if variant.company_id and variant.company_id != config.company_id:
+            return None, 'variant_not_available', _(
+                'Odoo variant %(value)s belongs to another company'
             ) % {'value': internal_product_id}
         return variant, None, None

@@ -6,7 +6,8 @@ Odoo module for Cartona supplier-integrations API. Products link via **`internal
 
 - **Product sync:** variant-only (`product.product`); outbound price/stock via `POST supplier-product/bulk-update`
 - **Order sync:** inbound pull + outbound status/line updates
-- **Global gate:** `cartona.config.is_cartona_sync_enabled` (default off)
+- **Multi-company:** one `cartona.config` per Odoo company, each with its own API token
+- **Sync gate:** `cartona.config.is_cartona_sync_enabled` per company (default off)
 - **Async jobs:** OCA `queue_job` on channel `cartona` (bundled in `addons/`)
 
 ## Prerequisites
@@ -39,10 +40,21 @@ docker compose restart web
 
 ## Configure Cartona
 
-1. **Cartona → Configuration**
-2. Set API URL and auth token
-3. **Test Connection**
-4. Enable **Enable Cartona Sync** when ready for live sync
+1. Switch to the target company (multi-company installs)
+2. **Cartona → Configuration** (creates a config for the active company if none exists)
+3. Set API URL and auth token (Cartona Manager only)
+4. **Test Connection**
+5. Enable **Enable Cartona Sync** when ready for live sync
+
+Repeat for each Odoo company that connects to a separate Cartona supplier account.
+
+## Multi-company notes
+
+- Overview, Recent Activity, and Log Details always reflect the **active company**
+- Product sync uses the config for the variant's company (or active company for shared products)
+- Per-config sync state lives on `cartona.product.sync` (one row per variant + config); shared variants get independent rows per company
+- The variant **Cartona** tab lists sync rows per configuration (rows appear after the first sync attempt for that config)
+- Record rules restrict configs, logs, and product sync rows to allowed companies
 
 ## Linking products
 
@@ -59,7 +71,7 @@ The variant form **Cartona** tab shows the Internal Product ID (readonly `id`). 
 1. Copy `cartona_odoo/` to your addons directory
 2. Extend `addons_path` with `.../cartona_odoo/addons`
 3. Install `queue_job`, then `cartona_odoo`
-4. Configure API credentials; enable sync when ready
+4. Configure API credentials per company; enable sync when ready
 
 Example `addons_path`:
 
@@ -75,6 +87,10 @@ odoo-bin -u cartona_odoo -d <database>
 
 Version **18.0.2.0.0** renames `marketplace_*` → `cartona_*` and removes product `cartona_id`. Run on every existing install before enabling sync.
 
+Version **18.0.2.0.31** enables one Cartona config per company (replaces global singleton).
+
+Version **18.0.2.0.32** moves variant sync status from `product.product` to `cartona.product.sync` (per variant and config).
+
 ## Architecture
 
 | Direction | Trigger | API |
@@ -85,11 +101,11 @@ Version **18.0.2.0.0** renames `marketplace_*` → `cartona_*` and removes produ
 | Odoo → Cartona status | SO state change / delivery validate | `POST order/update-order-status/:id` |
 | Odoo → Cartona lines | SO line create/write/unlink | `POST order/update-order-details` |
 
-**Emergency stop:** set `is_cartona_sync_enabled = False`.
+**Emergency stop:** set `is_cartona_sync_enabled = False` on the company's config.
 
 ## Troubleshooting
 
-- **Sync Logs:** Cartona → Sync Logs
+- **Overview / logs:** Cartona → Overview / Recent Activity / Log Details
 - **queue_job:** Settings → Technical → Queue Jobs (requires debug mode)
 - **Connection errors:** verify token and `api_base_url` trailing slash
-- **Order pull rejects lines:** ensure `internal_product_id` is set on Cartona and variant exists in Odoo
+- **Order pull rejects lines:** ensure `internal_product_id` is set on Cartona and variant exists in Odoo for that company

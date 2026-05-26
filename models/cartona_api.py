@@ -109,7 +109,9 @@ class CartonaAPI(models.Model):
             return {'success': True, 'data': response}
         return {'success': True, 'data': response}
 
-    def _build_variant_payload(self, variant, sync_fields):
+    def _build_variant_payload(self, variant, sync_fields, company=None):
+        if company:
+            variant = variant.with_company(company)
         payload = {'internal_product_id': str(variant.id)}
         if sync_fields in ('price', 'both'):
             payload['selling_price'] = str(variant.lst_price)
@@ -123,8 +125,10 @@ class CartonaAPI(models.Model):
         if not self._sync_active():
             return {'success': False, 'error': 'Cartona sync disabled'}
 
+        config = self._get_cartona_config()
+        company = config.company_id
         products_data = [
-            self._build_variant_payload(v, sync_fields) for v in variants
+            self._build_variant_payload(v, sync_fields, company=company) for v in variants
         ]
         result = self._make_api_request(
             'supplier-product/bulk-update', method='POST', data=products_data,
@@ -386,46 +390,73 @@ class CartonaAPI(models.Model):
     def cron_pull_orders(self):
         for config in self.env['cartona.config'].search([('is_cartona_sync_enabled', '=', True)]):
             try:
-                self.with_context(cartona_config_id=config.id).pull_and_process_orders()
+                self.with_company(config.company_id).with_context(
+                    cartona_config_id=config.id,
+                ).pull_and_process_orders()
             except Exception as err:
-                _logger.error('Cron order pull failed: %s', err)
+                _logger.error('Cron order pull failed for company %s: %s', config.company_id.name, err)
 
     @api.model
     def cron_retry_product_sync(self):
         for config in self.env['cartona.config'].search([('is_cartona_sync_enabled', '=', True)]):
             try:
-                self.with_context(cartona_config_id=config.id).retry_failed_variants()
+                self.with_company(config.company_id).with_context(
+                    cartona_config_id=config.id,
+                ).retry_failed_variants()
             except Exception as err:
-                _logger.error('Cron product retry failed: %s', err)
+                _logger.error('Cron product retry failed for company %s: %s', config.company_id.name, err)
+
+    def _collect_variants_for_retry(self, config, limit=100):
+        sync_model = self.env['cartona.product.sync']
+        sync_recs = sync_model.search([
+            ('cartona_config_id', '=', config.id),
+            ('sync_status', 'in', ['not_synced', 'error']),
+        ], limit=limit)
+        variants = sync_recs.mapped('product_id')
+        remaining = max(0, limit - len(variants))
+        if remaining:
+            synced_product_ids = sync_model.search([
+                ('cartona_config_id', '=', config.id),
+            ]).mapped('product_id').ids
+            extra_products = self.env['product.product'].with_company(config.company_id).search([
+                ('sale_ok', '=', True),
+                ('company_id', 'in', [False, config.company_id.id]),
+                ('id', 'not in', synced_product_ids),
+            ], limit=remaining)
+            if extra_products:
+                for product in extra_products:
+                    sync_model.get_for_product_config(product, config)
+                variants |= extra_products
+        return variants, sync_model
 
     def retry_failed_variants(self, limit=100):
         import time
         config = self._get_cartona_config()
         if not config.is_cartona_sync_enabled:
             return
-        variants = self.env['product.product'].search([
-            ('sale_ok', '=', True),
-            ('cartona_sync_status', 'in', ['not_synced', 'error']),
-        ], limit=limit)
+        variants, sync_model = self._collect_variants_for_retry(config, limit=limit)
         if not variants:
             return
         success_count = error_count = 0
         last_error = None
         detail_lines = []
         batch_start = time.time()
+        result = {}
         for i in range(0, len(variants), config.batch_size):
             batch = variants[i:i + config.batch_size]
+            batch_sync_recs = sync_model.search([
+                ('cartona_config_id', '=', config.id),
+                ('product_id', 'in', batch.ids),
+            ])
+            batch_sync_recs.mark_syncing()
             result = self.bulk_update_products(batch, sync_fields='both')
             batch_payloads = [
-                self._build_variant_payload(variant, 'both') for variant in batch
+                self._build_variant_payload(variant, 'both', company=config.company_id)
+                for variant in batch
             ]
             if result.get('success'):
                 success_count += len(batch)
-                batch.with_context(skip_cartona_sync=True).write({
-                    'cartona_sync_status': 'synced',
-                    'cartona_sync_date': fields.Datetime.now(),
-                    'cartona_sync_error': False,
-                })
+                batch_sync_recs.mark_success()
                 for variant, payload in zip(batch, batch_payloads):
                     detail_lines.append({
                         'status': 'success',
@@ -446,11 +477,7 @@ class CartonaAPI(models.Model):
             else:
                 error_count += len(batch)
                 last_error = result.get('error', 'Unknown error')
-                batch.with_context(skip_cartona_sync=True).write({
-                    'cartona_sync_status': 'error',
-                    'cartona_sync_date': fields.Datetime.now(),
-                    'cartona_sync_error': last_error,
-                })
+                batch_sync_recs.mark_error(last_error)
                 for variant, payload in zip(batch, batch_payloads):
                     detail_lines.append({
                         'status': 'error',

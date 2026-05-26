@@ -2,8 +2,6 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 import logging
 
-from .cartona_mixin import cartona_sync_enabled
-
 _logger = logging.getLogger(__name__)
 
 
@@ -45,11 +43,19 @@ class SaleOrder(models.Model):
     ], default='delivered_by_supplier')
     cartona_delivery_otp = fields.Char(copy=False)
 
+    def _cartona_sync_active(self):
+        self.ensure_one()
+        return bool(
+            self.cartona_config_id
+            and self.cartona_config_id.is_cartona_sync_enabled
+        )
+
     def write(self, vals):
         result = super().write(vals)
         if any(field in vals for field in ('state', 'delivery_status')):
-            if not self.env.context.get('skip_cartona_sync') and cartona_sync_enabled(self.env):
+            if not self.env.context.get('skip_cartona_sync'):
                 orders_to_sync = self.filtered('is_cartona_order')._filter_orders_for_sync()
+                orders_to_sync = orders_to_sync.filtered('_cartona_sync_active')
                 if orders_to_sync:
                     orders_to_sync._trigger_status_sync()
         return result
@@ -69,14 +75,16 @@ class SaleOrder(models.Model):
     def _trigger_status_sync(self):
         for order in self:
             if order.cartona_id and order.cartona_config_id:
-                order.with_delay(
+                order.with_context(
+                    cartona_config_id=order.cartona_config_id.id,
+                ).with_delay(
                     channel='cartona',
                     description=f'Sync order status {order.name} to Cartona',
                 )._sync_status_to_cartona()
 
     def _sync_status_to_cartona(self):
         self.ensure_one()
-        if not cartona_sync_enabled(self.env):
+        if not self._cartona_sync_active():
             return
         if not self.cartona_id or not self.cartona_config_id:
             return
@@ -130,7 +138,7 @@ class SaleOrder(models.Model):
 
     def action_manual_sync_to_cartona(self):
         self.ensure_one()
-        if not cartona_sync_enabled(self.env):
+        if not self._cartona_sync_active():
             raise UserError(_('Enable Cartona sync on configuration first.'))
         if not self.cartona_id:
             raise UserError(_('Order sync requires External Order ID'))
@@ -149,7 +157,7 @@ class SaleOrder(models.Model):
 
     def _sync_order_details_to_cartona(self):
         self.ensure_one()
-        if not cartona_sync_enabled(self.env):
+        if not self._cartona_sync_active():
             return
         if not self.is_cartona_order or not self.cartona_id or not self.cartona_config_id:
             return
@@ -238,7 +246,7 @@ class SaleOrder(models.Model):
 
     def _sync_cancelled_line_to_cartona(self, line_id):
         self.ensure_one()
-        if not cartona_sync_enabled(self.env):
+        if not self._cartona_sync_active():
             return
         if not self.cartona_id or not self.cartona_config_id:
             return
@@ -249,7 +257,7 @@ class SaleOrder(models.Model):
 
     def _sync_delivery_validation_to_cartona(self):
         self.ensure_one()
-        if not cartona_sync_enabled(self.env):
+        if not self._cartona_sync_active():
             return
         if not self.cartona_id or not self.cartona_config_id:
             return
@@ -330,11 +338,14 @@ class SaleOrderLine(models.Model):
     _DETAIL_SYNC_FIELDS = {'product_uom_qty', 'price_unit', 'product_id', 'cartona_line_notes'}
 
     def _enqueue_detail_sync(self):
-        if not cartona_sync_enabled(self.env):
-            return
         for order in self.mapped('order_id'):
-            if order.is_cartona_order and order.cartona_id:
-                order.with_delay(
+            if (order.is_cartona_order
+                    and order.cartona_id
+                    and order.cartona_config_id
+                    and order.cartona_config_id.is_cartona_sync_enabled):
+                order.with_context(
+                    cartona_config_id=order.cartona_config_id.id,
+                ).with_delay(
                     channel='cartona',
                     description=f'Sync order details to Cartona [{order.name}]',
                 )._sync_order_details_to_cartona()
@@ -362,10 +373,14 @@ class SaleOrderLine(models.Model):
                 except (ValueError, TypeError):
                     pass
         result = super().unlink()
-        if not self.env.context.get('skip_cartona_sync') and cartona_sync_enabled(self.env):
+        if not self.env.context.get('skip_cartona_sync'):
             for order, line_id in to_cancel:
-                if order.cartona_id and order.cartona_config_id:
-                    order.with_delay(
+                if (order.cartona_id
+                        and order.cartona_config_id
+                        and order.cartona_config_id.is_cartona_sync_enabled):
+                    order.with_context(
+                        cartona_config_id=order.cartona_config_id.id,
+                    ).with_delay(
                         channel='cartona',
                         description=f'Cancel line {line_id} on Cartona order [{order.name}]',
                     )._sync_cancelled_line_to_cartona(line_id)

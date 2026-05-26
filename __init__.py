@@ -3,10 +3,12 @@ from . import wizards
 
 
 def post_init_hook(env):
-    """Create singleton Cartona configuration on install."""
-    if not env['cartona.config'].search([]):
+    """Create Cartona configuration for the main company on fresh install."""
+    main_company = env.ref('base.main_company')
+    if not env['cartona.config'].search([('company_id', '=', main_company.id)]):
         env['cartona.config'].create({
             'name': 'Cartona',
+            'company_id': main_company.id,
             'auth_token': 'CHANGE_ME',
         })
     admin = env.ref('base.user_admin')

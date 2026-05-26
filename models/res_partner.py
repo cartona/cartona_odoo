@@ -63,8 +63,10 @@ class ResPartner(models.Model):
             external_id = f'retailer_unknown_{fields.Datetime.now().timestamp()}'
             retailer_name = 'Cartona Customer'
 
+        company = cartona_config.company_id
         partner = self.with_context(skip_cartona_sync=True).search([
-            ('company_id', 'in', [self.env.company.id, False]),
+            ('company_id', 'in', [company.id, False]),
+            ('cartona_config_id', '=', cartona_config.id),
             '|', '|',
             ('cartona_id', '=', external_id),
             ('phone', '=', retailer_number),
@@ -77,7 +79,7 @@ class ResPartner(models.Model):
 
         vals = {
             'name': retailer_name,
-            'company_id': self.env.company.id,
+            'company_id': company.id,
             'phone': retailer_number,
             'email': customer_data.get('retailer_email') or customer_data.get('email'),
             'street': customer_data.get('retailer_address') or customer_data.get('street'),

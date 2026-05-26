@@ -1,5 +1,6 @@
 from . import cartona_config
 from . import cartona_api
+from . import cartona_product_sync
 from . import cartona_sync_log
 from . import cartona_sync_log_line
 from . import cartona_order_processor
