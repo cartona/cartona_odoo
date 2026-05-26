@@ -55,7 +55,7 @@ class SaleOrder(models.Model):
         if any(field in vals for field in ('state', 'delivery_status')):
             if not self.env.context.get('skip_cartona_sync'):
                 orders_to_sync = self.filtered('is_cartona_order')._filter_orders_for_sync()
-                orders_to_sync = orders_to_sync.filtered('_cartona_sync_active')
+                orders_to_sync = orders_to_sync.filtered(lambda o: o._cartona_sync_active())
                 if orders_to_sync:
                     orders_to_sync._trigger_status_sync()
         return result
