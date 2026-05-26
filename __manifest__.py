@@ -1,6 +1,6 @@
 {
     'name': 'Cartona Integration',
-    'version': '18.0.2.0.40',
+    'version': '18.0.2.0.41',
     'category': 'Sales',
     'summary': 'Cartona supplier integration for Odoo 18',
     'description': """
@@ -18,6 +18,7 @@ Connect Odoo to Cartona supplier-integrations API:
     'author': 'Cartona Integration Team',
     'website': 'https://cartona.com',
     'license': 'LGPL-3',
+    'images': ['static/description/icon.png'],
     'depends': [
         'base',
         'mail',
