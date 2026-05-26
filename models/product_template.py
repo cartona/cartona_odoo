@@ -1,8 +1,19 @@
+import logging
+
 from odoo import models
+
+_logger = logging.getLogger(__name__)
 
 
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
+
+    def _sync_to_marketplaces(self):
+        """Legacy queue_job method — sync moved to product variants."""
+        _logger.info(
+            'Skipping legacy template marketplace sync job for templates %s',
+            self.ids,
+        )
 
     def write(self, vals):
         result = super().write(vals)

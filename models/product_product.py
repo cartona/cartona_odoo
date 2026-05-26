@@ -133,6 +133,11 @@ class ProductProduct(models.Model):
                 **log_kwargs,
             )
 
+    def _sync_stock_to_marketplaces(self):
+        """Legacy queue_job method from pre-cartona rename."""
+        for record in self:
+            record._sync_to_cartona('stock')
+
     def action_manual_cartona_sync(self):
         self.ensure_one()
         config = self._cartona_config()

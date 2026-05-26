@@ -82,6 +82,10 @@ class SaleOrder(models.Model):
                     description=f'Sync order status {order.name} to Cartona',
                 )._sync_status_to_cartona()
 
+    def _sync_status_to_marketplace(self):
+        """Legacy queue_job method from pre-cartona rename."""
+        return self._sync_status_to_cartona()
+
     def _sync_status_to_cartona(self):
         self.ensure_one()
         if not self._cartona_sync_active():
