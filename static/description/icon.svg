@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Cartona">
-  <rect width="256" height="256" rx="56" fill="#15268E"/>
-  <path fill="#FF951A" d="M158 46 L182 98 L150 112 L126 60 Z"/>
-  <path fill="#FFFFFF" d="M48 164 C48 128 84 100 132 100 C150 100 166 106 178 118 L156 136 C146 130 136 126 124 126 C96 126 74 144 74 164 C74 184 96 204 128 204 C146 204 162 198 176 186 L192 206 C172 222 152 230 128 230 C74 230 48 198 48 164 Z"/>
-</svg>
