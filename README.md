@@ -93,6 +93,8 @@ Version **18.0.2.0.32** moves variant sync status from `product.product` to `car
 
 Version **18.0.2.0.33** cleans stale product views referencing removed `cartona_id` / `cartona_sync_*` fields before upgrade.
 
+Version **18.0.2.0.39** removes marketplace-era cron, groups, ACL duplicates, orphan wizard table, and legacy `product_product.cartona_sync_*` columns.
+
 ## Architecture
 
 | Direction | Trigger | API |
