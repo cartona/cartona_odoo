@@ -1,3 +1,5 @@
+from collections import Counter
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 import logging
@@ -102,13 +104,29 @@ class CartonaOrderProcessor(models.Model):
         issues = []
         try:
             config = self._get_cartona_config()
-            validated_order, validation_issues = self._validate_order_data(order_data)
+            validated_order, validation_issues = self._validate_order_data(
+                order_data, config=config,
+            )
             issues.extend(validation_issues)
             if not validated_order:
                 return self._make_result(False, order_data=order_data, issues=issues)
 
             existing_order = self._find_existing_order(validated_order['order_id'], config)
             if existing_order:
+                if not self._ensure_order_lines(
+                    existing_order,
+                    validated_order['order_lines'],
+                    order_data,
+                    issues,
+                ):
+                    self._mark_order_sync_error(
+                        existing_order,
+                        _('Order line validation failed — all lines require a valid Odoo variant'),
+                    )
+                    return self._make_result(
+                        False, order_data=order_data, issues=issues, order=existing_order,
+                    )
+
                 cartona_status = validated_order.get('status', 'pending')
                 new_odoo_state = self._map_cartona_state_to_odoo(cartona_status, config)
                 if (existing_order.state != new_odoo_state
@@ -181,7 +199,40 @@ class CartonaOrderProcessor(models.Model):
             self._ack_order_synced_to_cartona(order)
         return result
 
-    def _validate_order_data(self, order_data):
+    def _mark_order_sync_error(self, order, message):
+        if not order:
+            return
+        order.with_context(skip_cartona_sync=True).write({
+            'cartona_sync_status': 'error',
+            'cartona_error_message': message,
+        })
+
+    def _normalize_line_id(self, line_id):
+        if line_id is None or line_id is False:
+            return False
+        return str(line_id)
+
+    def _payload_line_signatures(self, items_data):
+        return Counter(
+            (
+                self._normalize_line_id(item.get('cartona_line_id')),
+                str(item['internal_product_id']),
+                float(item['quantity']),
+            )
+            for item in items_data
+        )
+
+    def _order_line_signatures(self, order):
+        return Counter(
+            (
+                self._normalize_line_id(line.cartona_line_id),
+                str(line.product_id.id),
+                float(line.product_uom_qty),
+            )
+            for line in order.order_line
+        )
+
+    def _validate_order_data(self, order_data, config=None):
         issues = []
         if isinstance(order_data, list):
             if not order_data:
@@ -278,30 +329,42 @@ class CartonaOrderProcessor(models.Model):
             'order_lines': [],
         }
 
+        validated_lines = []
         for line_data in order_details:
-            validated_line, line_issue = self._validate_order_item(line_data, order_data)
-            if validated_line:
-                normalized_data['order_lines'].append(validated_line)
-            elif line_issue:
+            validated_line, line_issue = self._validate_order_item(
+                line_data, order_data, config=config,
+            )
+            if line_issue:
                 issues.append(line_issue)
-
-        if not normalized_data['order_lines']:
-            if not issues:
+            if not validated_line:
                 issues.append(self._make_issue(
                     'error', 'order',
-                    _('Order %(order)s failed validation: no valid order lines') % {
+                    _('Order %(order)s rejected: all order lines must be valid') % {
                         'order': order_label,
                     },
                     order_data=order_data,
                     error_code='no_valid_order_lines',
                 ))
-            return None, issues
+                return None, issues
+            validated_lines.append(validated_line)
+
+        normalized_data['order_lines'] = validated_lines
         return normalized_data, issues
 
-    def _validate_order_item(self, item_data, order_data):
+    def _validate_order_item(self, item_data, order_data, config=None):
         order_ref = self._order_identifiers(order_data)
         order_label = order_ref.get('cartona_order_number') or order_ref.get('cartona_order_id') or '?'
-        line_id = item_data.get('id')
+        line_id = item_data.get('id') if isinstance(item_data, dict) else None
+
+        if not isinstance(item_data, dict):
+            return None, self._make_issue(
+                'error', 'order_line',
+                _('Order %(order)s: invalid order detail payload') % {
+                    'order': order_label,
+                },
+                order_data=order_data,
+                error_code='invalid_order_details',
+            )
 
         if not item_data.get('internal_product_id'):
             return None, self._make_issue(
@@ -325,15 +388,55 @@ class CartonaOrderProcessor(models.Model):
                 item_data=item_data,
                 error_code='other',
             )
+        try:
+            quantity = float(item_data['amount'])
+        except (TypeError, ValueError):
+            return None, self._make_issue(
+                'error', 'order_line',
+                _('Order %(order)s: order detail #%(line)s has invalid amount') % {
+                    'order': order_label,
+                    'line': line_id or '?',
+                },
+                order_data=order_data,
+                item_data=item_data,
+                error_code='other',
+            )
+        if quantity <= 0:
+            return None, self._make_issue(
+                'error', 'order_line',
+                _('Order %(order)s: order detail #%(line)s must have amount > 0') % {
+                    'order': order_label,
+                    'line': line_id or '?',
+                },
+                order_data=order_data,
+                item_data=item_data,
+                error_code='other',
+            )
 
-        return {
+        normalized = {
             'internal_product_id': str(item_data['internal_product_id']),
-            'quantity': float(item_data['amount']),
+            'quantity': quantity,
             'unit_price': float(item_data.get('selling_price', 0)),
-            'total_price': float(item_data.get('selling_price', 0)) * float(item_data['amount']),
+            'total_price': float(item_data.get('selling_price', 0)) * quantity,
             'cartona_line_id': item_data.get('id'),
             'comment': item_data.get('comment'),
-        }, None
+        }
+        product, error_code, error_message = self._resolve_variant(
+            normalized, config=config,
+        )
+        if not product:
+            return None, self._make_issue(
+                'error', 'order_line',
+                _('Order %(order)s: order detail #%(line)s: %(detail)s') % {
+                    'order': order_label,
+                    'line': line_id or '?',
+                    'detail': error_message,
+                },
+                order_data=order_data,
+                item_data=normalized,
+                error_code=error_code,
+            )
+        return normalized, None
 
     def _find_existing_order(self, order_id, config):
         return self.env['sale.order'].search([
@@ -405,10 +508,13 @@ class CartonaOrderProcessor(models.Model):
                     record=order,
                     error_code='state_transition_error',
                 ))
+                order.unlink()
                 return None
             return order
         except Exception as err:
             _logger.error('Error creating order: %s', err)
+            if locals().get('order') and order.exists():
+                order.unlink()
             issues.append(self._make_issue(
                 'error', 'order',
                 _('Order %(order)s failed: %s') % (order_label, err),
@@ -492,6 +598,41 @@ class CartonaOrderProcessor(models.Model):
         except Exception as err:
             _logger.error('Error completing delivery %s: %s', picking.name, err)
 
+    def _ensure_order_lines(self, order, items_data, order_data, issues):
+        """Every payload line must match SO lines by cartona_line_id, variant, and qty."""
+        order_label = order.cartona_order_number or order.cartona_id
+        expected_sigs = self._payload_line_signatures(items_data)
+        actual_sigs = self._order_line_signatures(order)
+        if actual_sigs == expected_sigs:
+            return True
+        if not order.order_line:
+            if order.state != 'draft':
+                issues.append(self._make_issue(
+                    'error', 'order',
+                    _('Order %(order)s has no lines and is not draft — manual fix required') % {
+                        'order': order_label,
+                    },
+                    order_data=order_data,
+                    record=order,
+                    error_code='no_valid_order_lines',
+                ))
+                return False
+            return self._create_order_lines(order, items_data, order_data, issues)
+        issues.append(self._make_issue(
+            'error', 'order',
+            _('Order %(order)s rejected: SO lines do not match Cartona order details') % {
+                'order': order_label,
+            },
+            order_data=order_data,
+            record=order,
+            error_code='no_valid_order_lines',
+        ))
+        return False
+
+    def _rollback_created_order_lines(self, line_ids):
+        if line_ids:
+            self.env['sale.order.line'].browse(line_ids).unlink()
+
     def _update_existing_order(self, order, order_data, config, issues):
         order_label = order_data.get('cartona_order_number') or order_data.get('order_id')
         try:
@@ -541,43 +682,61 @@ class CartonaOrderProcessor(models.Model):
 
     def _create_order_lines(self, order, items_data, order_data, issues):
         lines_created = 0
+        created_line_ids = []
         order_label = order.cartona_order_number or order.cartona_id
-        for item_data in items_data:
-            product, error_code, error_message = self._resolve_variant(
-                item_data, config=order.cartona_config_id,
-            )
-            if not product:
-                line_id = item_data.get('cartona_line_id') or '?'
-                internal_product_id = item_data.get('internal_product_id')
-                issues.append(self._make_issue(
-                    'error', 'order_line',
-                    _('Order %(order)s failed on order detail #%(line)s: %(detail)s') % {
-                        'order': order_label,
-                        'line': line_id,
-                        'detail': error_message,
-                    },
-                    order_data={'hashed_id': order.cartona_id, 'receipt_id': order.cartona_order_number},
-                    item_data=item_data,
-                    error_code=error_code,
-                ))
-                _logger.error(
-                    'Order line creation failed for %s: internal_product_id=%s (%s)',
-                    order.name, internal_product_id, error_message,
+        try:
+            for item_data in items_data:
+                product, error_code, error_message = self._resolve_variant(
+                    item_data, config=order.cartona_config_id,
                 )
-                return False
+                if not product:
+                    line_id = item_data.get('cartona_line_id') or '?'
+                    internal_product_id = item_data.get('internal_product_id')
+                    issues.append(self._make_issue(
+                        'error', 'order_line',
+                        _('Order %(order)s failed on order detail #%(line)s: %(detail)s') % {
+                            'order': order_label,
+                            'line': line_id,
+                            'detail': error_message,
+                        },
+                        order_data={'hashed_id': order.cartona_id, 'receipt_id': order.cartona_order_number},
+                        item_data=item_data,
+                        error_code=error_code,
+                    ))
+                    _logger.error(
+                        'Order line creation failed for %s: internal_product_id=%s (%s)',
+                        order.name, internal_product_id, error_message,
+                    )
+                    self._rollback_created_order_lines(created_line_ids)
+                    return False
 
-            self.env['sale.order.line'].with_context(skip_cartona_sync=True).create({
-                'order_id': order.id,
-                'product_id': product.id,
-                'name': product.name,
-                'product_uom_qty': item_data['quantity'],
-                'price_unit': item_data['unit_price'],
-                'cartona_line_id': item_data.get('cartona_line_id'),
-                'cartona_line_notes': item_data.get('comment'),
-            })
-            lines_created += 1
+                line = self.env['sale.order.line'].with_context(skip_cartona_sync=True).create({
+                    'order_id': order.id,
+                    'product_id': product.id,
+                    'name': product.name,
+                    'product_uom_qty': item_data['quantity'],
+                    'price_unit': item_data['unit_price'],
+                    'cartona_line_id': item_data.get('cartona_line_id'),
+                    'cartona_line_notes': item_data.get('comment'),
+                })
+                created_line_ids.append(line.id)
+                lines_created += 1
+        except Exception as err:
+            self._rollback_created_order_lines(created_line_ids)
+            issues.append(self._make_issue(
+                'error', 'order',
+                _('Order %(order)s failed while creating lines: %s') % (order_label, err),
+                order_data=order_data,
+                record=order,
+                error_code='unexpected_error',
+            ))
+            _logger.error('Error creating order lines for %s: %s', order.name, err)
+            return False
 
-        return lines_created > 0
+        if lines_created != len(items_data):
+            self._rollback_created_order_lines(created_line_ids)
+            return False
+        return True
 
     def _find_or_create_customer(self, customer_data, config):
         try:
