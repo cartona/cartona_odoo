@@ -72,32 +72,6 @@
                                 No product mapping failures in the last 24 hours.
                             </div>
                         </page>
-                        <page string="Other Order Issues (24h)" name="other_order_issues">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted">
-                                    <field name="dashboard_other_order_issue_count" readonly="1" class="oe_inline"/>
-                                    other order or order line issue(s) in the last 24 hours
-                                </span>
-                                <button name="action_view_other_order_issues" type="object"
-                                        string="Open in Log Details" class="btn-link"
-                                        invisible="not dashboard_other_order_issue_count"/>
-                            </div>
-                            <field name="dashboard_other_order_issue_ids" nolabel="1" readonly="1"
-                                   invisible="not dashboard_other_order_issue_count">
-                                <list limit="10" create="false" duplicate="false"
-                                      edit="false" delete="false">
-                                    <field name="sync_log_create_date" string="When"/>
-                                    <field name="entry_type"/>
-                                    <field name="cartona_order_number" string="Order #"/>
-                                    <field name="cartona_line_id" string="Detail #"/>
-                                    <field name="error_code"/>
-                                    <field name="message"/>
-                                </list>
-                            </field>
-                            <div class="text-muted" invisible="dashboard_other_order_issue_count">
-                                No other order issues in the last 24 hours.
-                            </div>
-                        </page>
                         <page string="Recent Sync Errors (24h)" name="recent_sync_issues">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="text-muted">

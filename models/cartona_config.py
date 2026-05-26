@@ -99,18 +99,6 @@ class CartonaConfig(models.Model):
         compute='_compute_dashboard_issue_counts',
         string='Product Mapping Issues',
     )
-    dashboard_other_order_issue_ids = fields.Many2many(
-        'cartona.sync.log.line',
-        'cartona_config_other_order_rel',
-        'config_id',
-        'line_id',
-        string='Other Order Issues (24h)',
-        readonly=True,
-    )
-    dashboard_other_order_issue_count = fields.Integer(
-        compute='_compute_dashboard_issue_counts',
-        string='Other Order Issues',
-    )
     dashboard_recent_sync_issue_ids = fields.Many2many(
         'cartona.sync.log',
         'cartona_config_recent_sync_rel',
@@ -336,16 +324,12 @@ class CartonaConfig(models.Model):
 
     @api.depends(
         'dashboard_product_mapping_issue_ids',
-        'dashboard_other_order_issue_ids',
         'dashboard_recent_sync_issue_ids',
     )
     def _compute_dashboard_issue_counts(self):
         for config in self:
             config.dashboard_product_mapping_issue_count = len(
                 config.dashboard_product_mapping_issue_ids,
-            )
-            config.dashboard_other_order_issue_count = len(
-                config.dashboard_other_order_issue_ids,
             )
             config.dashboard_recent_sync_issue_count = len(
                 config.dashboard_recent_sync_issue_ids,
@@ -365,17 +349,6 @@ class CartonaConfig(models.Model):
             ('error_code', 'in', list(_PRODUCT_MAPPING_ERROR_CODES)),
         ]
 
-    def _dashboard_other_order_domain(self, since=None):
-        self.ensure_one()
-        since = since or self._dashboard_issue_since()
-        return [
-            ('sync_log_id.cartona_config_id', '=', self.id),
-            ('sync_log_id.create_date', '>=', since),
-            ('entry_type', 'in', ['order', 'order_line']),
-            ('status', 'in', ['error', 'warning']),
-            ('error_code', 'not in', list(_PRODUCT_MAPPING_ERROR_CODES)),
-        ]
-
     def _dashboard_recent_sync_domain(self, since=None):
         self.ensure_one()
         since = since or self._dashboard_issue_since()
@@ -393,14 +366,10 @@ class CartonaConfig(models.Model):
         for config in self:
             since = config._dashboard_issue_since()
             mapping_domain = config._dashboard_product_mapping_domain(since)
-            other_domain = config._dashboard_other_order_domain(since)
             sync_domain = config._dashboard_recent_sync_domain(since)
             config.sudo().write({
                 'dashboard_product_mapping_issue_ids': [(6, 0, line_model.search(
                     mapping_domain, order=line_order, limit=DASHBOARD_ISSUE_EMBED_LIMIT,
-                ).ids)],
-                'dashboard_other_order_issue_ids': [(6, 0, line_model.search(
-                    other_domain, order=line_order, limit=DASHBOARD_ISSUE_EMBED_LIMIT,
                 ).ids)],
                 'dashboard_recent_sync_issue_ids': [(6, 0, log_model.search(
                     sync_domain, order=log_order, limit=DASHBOARD_ISSUE_EMBED_LIMIT,
@@ -525,17 +494,6 @@ class CartonaConfig(models.Model):
             **(action.get('context') or {}),
             'search_default_filter_order_line': 1,
             'search_default_filter_product_mapping': 1,
-        }
-        return action
-
-    def action_view_other_order_issues(self):
-        self.ensure_one()
-        action = self.action_dashboard_log_details()
-        action['name'] = _('Other Order Issues (24h)')
-        action['domain'] = self._dashboard_other_order_domain()
-        action['context'] = {
-            **(action.get('context') or {}),
-            'search_default_filter_error': 1,
         }
         return action
 
