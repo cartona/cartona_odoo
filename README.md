@@ -91,6 +91,8 @@ Version **18.0.2.0.31** enables one Cartona config per company (replaces global 
 
 Version **18.0.2.0.32** moves variant sync status from `product.product` to `cartona.product.sync` (per variant and config).
 
+Version **18.0.2.0.33** cleans stale product views referencing removed `cartona_id` / `cartona_sync_*` fields before upgrade.
+
 ## Architecture
 
 | Direction | Trigger | API |
