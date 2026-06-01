@@ -679,6 +679,47 @@ class CartonaConfig(models.Model):
             },
         }
 
+    def manual_sync_all_variants(self):
+        self.ensure_one()
+        if not self.is_cartona_sync_enabled:
+            raise UserError(_('Enable Cartona sync on configuration first.'))
+        company = self.company_id
+        variant_count = self.env['product.product'].with_company(company).search_count(
+            self._dashboard_eligible_product_domain(),
+        )
+        if not variant_count:
+            raise UserError(_(
+                'No saleable product variants found for %s.',
+            ) % company.display_name)
+        self.with_delay(
+            channel='cartona',
+            description=_(
+                'Sync all saleable variants to Cartona (%s)',
+            ) % company.display_name,
+        ).sync_all_variants_job()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Variant Sync Queued'),
+                'message': _(
+                    '%(count)s variant(s) queued for price and stock sync '
+                    'for %(company)s. Track progress in Recent Activity.',
+                ) % {'count': variant_count, 'company': company.display_name},
+                'type': 'info',
+            },
+        }
+
+    def sync_all_variants_job(self):
+        """Queue job entrypoint: restore config context then run bulk sync."""
+        self.ensure_one()
+        if not self.is_cartona_sync_enabled:
+            return
+        self.env['cartona.api'].with_company(self.company_id).with_context(
+            cartona_config_id=self.id,
+            cartona_log_action_type='manual',
+        ).sync_all_variants()
+
     def action_view_synced_variants(self):
         return self._action_view_sync_by_status('synced')
 

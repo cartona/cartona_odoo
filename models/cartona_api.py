@@ -429,19 +429,29 @@ class CartonaAPI(models.Model):
                 variants |= extra_products
         return variants, sync_model
 
-    def retry_failed_variants(self, limit=100):
+    def _sync_variants_in_batches(
+        self,
+        config,
+        variants,
+        *,
+        success_message,
+        failure_message,
+        summary_message,
+    ):
         import time
-        config = self._get_cartona_config()
-        if not config.is_cartona_sync_enabled:
-            return
-        variants, sync_model = self._collect_variants_for_retry(config, limit=limit)
+
+        sync_model = self.env['cartona.product.sync']
         if not variants:
             return
+        for product in variants:
+            sync_model.get_for_product_config(product, config)
         success_count = error_count = 0
         last_error = None
         detail_lines = []
         batch_start = time.time()
         result = {}
+        company = config.company_id
+        variants = variants.with_company(company)
         for i in range(0, len(variants), config.batch_size):
             batch = variants[i:i + config.batch_size]
             batch_sync_recs = sync_model.search([
@@ -451,7 +461,7 @@ class CartonaAPI(models.Model):
             batch_sync_recs.mark_syncing()
             result = self.bulk_update_products(batch, sync_fields='both')
             batch_payloads = [
-                self._build_variant_payload(variant, 'both', company=config.company_id)
+                self._build_variant_payload(variant, 'both', company=company)
                 for variant in batch
             ]
             if result.get('success'):
@@ -465,7 +475,7 @@ class CartonaAPI(models.Model):
                         'record_model': 'product.product',
                         'record_id': variant.id,
                         'record_name': variant.display_name,
-                        'message': _('Synced variant %s (retry batch)') % variant.display_name,
+                        'message': success_message(variant),
                         'request_data': json.dumps({
                             'endpoint': 'supplier-product/bulk-update',
                             'method': 'POST',
@@ -486,7 +496,7 @@ class CartonaAPI(models.Model):
                         'record_model': 'product.product',
                         'record_id': variant.id,
                         'record_name': variant.display_name,
-                        'message': _('Failed to sync variant %s (retry batch)') % variant.display_name,
+                        'message': failure_message(variant),
                         'request_data': json.dumps({
                             'endpoint': 'supplier-product/bulk-update',
                             'method': 'POST',
@@ -499,8 +509,10 @@ class CartonaAPI(models.Model):
             cartona_config_id=config.id,
             operation_type='product_sync',
             status='success' if not error_count else ('warning' if success_count else 'error'),
-            message=(
-                f'Retry sync finished: {success_count} succeeded, {error_count} failed'
+            message=summary_message.format(
+                success=success_count,
+                error=error_count,
+                total=len(variants),
             ),
             records_processed=len(variants),
             records_success=success_count,
@@ -510,4 +522,52 @@ class CartonaAPI(models.Model):
             response_data=result.get('response_data') if variants else None,
             duration=time.time() - batch_start,
             line_vals_list=detail_lines,
+            action_type=self.env.context.get('cartona_log_action_type', 'automated'),
+        )
+        config._update_sync_stats()
+        config._refresh_dashboard_issues_if_stale(force=True)
+
+    def retry_failed_variants(self, limit=100):
+        config = self._get_cartona_config()
+        if not config.is_cartona_sync_enabled:
+            return
+        variants, _sync_model = self._collect_variants_for_retry(config, limit=limit)
+        if not variants:
+            return
+        self._sync_variants_in_batches(
+            config,
+            variants,
+            success_message=lambda variant: _(
+                'Synced variant %s (retry batch)',
+            ) % variant.display_name,
+            failure_message=lambda variant: _(
+                'Failed to sync variant %s (retry batch)',
+            ) % variant.display_name,
+            summary_message='Retry sync finished: {success} succeeded, {error} failed ({total} total)',
+        )
+
+    def sync_all_variants(self):
+        config = self._get_cartona_config()
+        if not config.is_cartona_sync_enabled:
+            return
+        company = config.company_id
+        variants = self.env['product.product'].with_company(company).search([
+            ('sale_ok', '=', True),
+            ('company_id', 'in', [False, company.id]),
+        ])
+        if not variants:
+            return
+        self._sync_variants_in_batches(
+            config,
+            variants,
+            success_message=lambda variant: _(
+                'Synced variant %s (bulk manual)',
+            ) % variant.display_name,
+            failure_message=lambda variant: _(
+                'Failed to sync variant %s (bulk manual)',
+            ) % variant.display_name,
+            summary_message=(
+                'Bulk variant sync finished: {success} succeeded, '
+                '{error} failed ({total} total)'
+            ),
         )

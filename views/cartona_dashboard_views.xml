@@ -14,6 +14,9 @@
                             string="Test Connection" class="btn-primary"/>
                     <button name="manual_pull_orders" type="object" string="Pull Orders"
                             invisible="not is_cartona_sync_enabled"/>
+                    <button name="manual_sync_all_variants" type="object"
+                            string="Sync All Variants"
+                            invisible="not is_cartona_sync_enabled"/>
                     <field name="connection_status" widget="statusbar"
                            statusbar_visible="not_tested,connected,error"/>
                 </header>
