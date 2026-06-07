@@ -116,7 +116,7 @@ class CartonaAPI(models.Model):
         if sync_fields in ('price', 'both'):
             payload['selling_price'] = str(variant.lst_price)
         if sync_fields in ('stock', 'both'):
-            payload['available_stock_quantity'] = int(variant.qty_available)
+            payload['available_stock_quantity'] = int(variant.free_qty)
         return payload
 
     def bulk_update_products(self, variants, sync_fields='both'):
