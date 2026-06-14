@@ -243,7 +243,7 @@ class CartonaConfig(models.Model):
     def get_api_headers(self):
         self.ensure_one()
         return {
-            CARTONA_AUTH_HEADER: self.auth_token,
+            CARTONA_AUTH_HEADER: self.sudo().auth_token,
             'Content-Type': 'application/json',
             'User-Agent': 'Odoo-Cartona-Integration/18.0',
         }
