@@ -3,14 +3,12 @@ from . import wizards
 
 
 def post_init_hook(env):
-    """Create Cartona configuration for the main company on fresh install."""
-    main_company = env.ref('base.main_company')
-    if not env['cartona.config'].search([('company_id', '=', main_company.id)]):
-        env['cartona.config'].create({
-            'name': 'Cartona',
-            'company_id': main_company.id,
-            'auth_token': 'CHANGE_ME',
-        })
+    """Grant the Cartona Manager group to admin on install.
+
+    No placeholder config is auto-created: a config now requires a warehouse,
+    and managers add one config per warehouse (with its token) from the
+    Cartona configs list. This keeps fresh/empty/warehouse-less setups safe.
+    """
     admin = env.ref('base.user_admin')
     manager_group = env.ref('cartona_odoo.group_cartona_manager')
     if manager_group not in admin.groups_id:

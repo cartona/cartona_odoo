@@ -24,14 +24,15 @@ class ProductProduct(models.Model):
         self.ensure_one()
         return self.company_id or self.env.company
 
-    def _cartona_config(self):
+    def _cartona_enabled_configs(self):
+        """All enabled configs for the variant's company (price/product fan-out)."""
         self.ensure_one()
-        return self.env['cartona.config'].get_for_company(self._cartona_company())
+        return self.env['cartona.config'].enabled_configs_for_company(
+            self._cartona_company(),
+        )
 
-    def _cartona_sync_record(self, config=None):
+    def _cartona_sync_record(self, config):
         self.ensure_one()
-        if not config:
-            config = self._cartona_config()
         if not config:
             return self.env['cartona.product.sync']
         return self.env['cartona.product.sync'].get_for_product_config(self, config)
@@ -42,19 +43,35 @@ class ProductProduct(models.Model):
             self._trigger_cartona_sync('price')
         return result
 
-    def _trigger_cartona_sync(self, sync_fields):
+    def _queue_cartona_sync(self, record, config, sync_fields):
+        record.with_context(
+            cartona_config_id=config.id,
+            cartona_warehouse_id=config.warehouse_id.id,
+        ).with_delay(
+            channel='cartona',
+            description=(
+                f'Sync variant {record.display_name} to Cartona '
+                f'[{config.warehouse_id.name}] ({sync_fields})'
+            ),
+        )._sync_to_cartona(sync_fields)
+
+    def _trigger_cartona_sync(self, sync_fields, warehouse=None):
+        """Route sync jobs by intent.
+
+        - stock: only the config of the affected ``warehouse``.
+        - price/product: fan out to every enabled config of the variant's company.
+        """
         if self.env.context.get('skip_cartona_sync'):
             return
+        config_model = self.env['cartona.config']
         for record in self:
-            config = record._cartona_config()
-            if not config or not config.is_cartona_sync_enabled:
-                continue
-            record.with_context(
-                cartona_config_id=config.id,
-            ).with_delay(
-                channel='cartona',
-                description=f'Sync variant {record.display_name} to Cartona ({sync_fields})',
-            )._sync_to_cartona(sync_fields)
+            if sync_fields == 'stock' and warehouse:
+                config = config_model.get_for_warehouse(warehouse)
+                configs = config if (config and config.is_cartona_sync_enabled) else config_model.browse()
+            else:
+                configs = record._cartona_enabled_configs()
+            for config in configs:
+                self._queue_cartona_sync(record, config, sync_fields)
 
     def _cartona_sync_operation_type(self, sync_fields):
         return 'stock_sync' if sync_fields == 'stock' else 'product_sync'
@@ -90,18 +107,22 @@ class ProductProduct(models.Model):
         if config_id:
             config = self.env['cartona.config'].browse(config_id)
         else:
-            config = self._cartona_config()
+            config = self._cartona_enabled_configs()[:1]
         if not config or not config.is_cartona_sync_enabled:
             return
+        warehouse = config.warehouse_id
         sync_rec = self.env['cartona.product.sync'].get_for_product_config(self, config)
         sync_rec.mark_syncing()
         api = self.env['cartona.api'].with_company(config.company_id).with_context(
             cartona_config_id=config.id,
+            cartona_warehouse_id=warehouse.id,
         )
         start = time.time()
         result = api.bulk_update_products(self, sync_fields=sync_fields)
         duration = time.time() - start
-        payload = api._build_variant_payload(self, sync_fields, company=config.company_id)
+        payload = api._build_variant_payload(
+            self, sync_fields, company=config.company_id, warehouse=warehouse,
+        )
         log = self.env['cartona.sync.log']
         log_kwargs = {
             'request_data': result.get('request_data'),
@@ -140,20 +161,30 @@ class ProductProduct(models.Model):
 
     def action_manual_cartona_sync(self):
         self.ensure_one()
-        config = self._cartona_config()
-        if not config or not config.is_cartona_sync_enabled:
-            raise UserError(_('Enable Cartona sync on configuration first.'))
-        self.with_context(
-            cartona_config_id=config.id,
-            cartona_log_action_type='manual',
-        )._sync_to_cartona('both')
-        sync_rec = self._cartona_sync_record(config)
+        configs = self._cartona_enabled_configs()
+        if not configs:
+            raise UserError(_('Enable Cartona sync on a configuration first.'))
+        synced = 0
+        for config in configs:
+            self.with_context(
+                cartona_config_id=config.id,
+                cartona_warehouse_id=config.warehouse_id.id,
+                cartona_log_action_type='manual',
+            )._sync_to_cartona('both')
+            if self._cartona_sync_record(config).sync_status == 'synced':
+                synced += 1
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Sync Complete'),
-                'message': _('Variant sync finished for %s') % self.display_name,
-                'type': 'success' if sync_rec.sync_status == 'synced' else 'warning',
+                'message': _(
+                    'Variant %(variant)s synced to %(synced)s of %(total)s warehouse config(s).'
+                ) % {
+                    'variant': self.display_name,
+                    'synced': synced,
+                    'total': len(configs),
+                },
+                'type': 'success' if synced == len(configs) else 'warning',
             },
         }

@@ -466,7 +466,7 @@ class CartonaOrderProcessor(models.Model):
                 return None
 
             cartona_status = order_data.get('status', 'pending')
-            order = self.env['sale.order'].with_context(skip_cartona_sync=True).create({
+            order_vals = {
                 'partner_id': customer.id,
                 'company_id': config.company_id.id,
                 'cartona_id': order_data['order_id'],
@@ -479,7 +479,10 @@ class CartonaOrderProcessor(models.Model):
                 'cartona_payment_method': order_data.get('payment_method', 'standard'),
                 'state': 'draft',
                 'origin': f'Cartona Order {order_data["order_id"]}',
-            })
+            }
+            if config.warehouse_id:
+                order_vals['warehouse_id'] = config.warehouse_id.id
+            order = self.env['sale.order'].with_context(skip_cartona_sync=True).create(order_vals)
 
             success = self._create_order_lines(
                 order, order_data['order_lines'], raw_order_data, issues,

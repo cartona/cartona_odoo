@@ -109,14 +109,27 @@ class CartonaAPI(models.Model):
             return {'success': True, 'data': response}
         return {'success': True, 'data': response}
 
-    def _build_variant_payload(self, variant, sync_fields, company=None):
+    def _resolve_sync_warehouse(self, config=None):
+        """Warehouse for stock scoping: context override, else the config's."""
+        warehouse = self.env['stock.warehouse']
+        wh_id = self.env.context.get('cartona_warehouse_id')
+        if wh_id:
+            warehouse = self.env['stock.warehouse'].browse(wh_id)
+        elif config is not None:
+            warehouse = config.warehouse_id
+        return warehouse
+
+    def _build_variant_payload(self, variant, sync_fields, company=None, warehouse=None):
         if company:
             variant = variant.with_company(company)
+        if warehouse is None:
+            warehouse = self._resolve_sync_warehouse(self._get_cartona_config())
         payload = {'internal_product_id': str(variant.id)}
         if sync_fields in ('price', 'both'):
             payload['selling_price'] = str(variant.lst_price)
         if sync_fields in ('stock', 'both'):
-            payload['available_stock_quantity'] = int(variant.free_qty)
+            stock_variant = variant.with_context(warehouse_id=warehouse.id) if warehouse else variant
+            payload['available_stock_quantity'] = int(stock_variant.free_qty)
         return payload
 
     def bulk_update_products(self, variants, sync_fields='both'):
@@ -127,8 +140,10 @@ class CartonaAPI(models.Model):
 
         config = self._get_cartona_config()
         company = config.company_id
+        warehouse = self._resolve_sync_warehouse(config)
         products_data = [
-            self._build_variant_payload(v, sync_fields, company=company) for v in variants
+            self._build_variant_payload(v, sync_fields, company=company, warehouse=warehouse)
+            for v in variants
         ]
         result = self._make_api_request(
             'supplier-product/bulk-update', method='POST', data=products_data,
@@ -451,6 +466,7 @@ class CartonaAPI(models.Model):
         batch_start = time.time()
         result = {}
         company = config.company_id
+        warehouse = config.warehouse_id
         variants = variants.with_company(company)
         for i in range(0, len(variants), config.batch_size):
             batch = variants[i:i + config.batch_size]
@@ -461,7 +477,7 @@ class CartonaAPI(models.Model):
             batch_sync_recs.mark_syncing()
             result = self.bulk_update_products(batch, sync_fields='both')
             batch_payloads = [
-                self._build_variant_payload(variant, 'both', company=company)
+                self._build_variant_payload(variant, 'both', company=company, warehouse=warehouse)
                 for variant in batch
             ]
             if result.get('success'):

@@ -4,15 +4,41 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+def _trigger_stock_sync_by_warehouse(records, location_fields):
+    """Group products by affected internal warehouse and trigger a scoped sync.
+
+    ``records`` is a stock.move or stock.quant recordset; ``location_fields`` are
+    the location field names to inspect (source/dest for moves, location for
+    quants). Only internal locations mapped to a warehouse fire a sync, and each
+    warehouse only fires for the products that actually changed there.
+    """
+    by_warehouse = {}
+    for record in records:
+        product = record.product_id
+        if not product:
+            continue
+        for field_name in location_fields:
+            location = record[field_name]
+            if not location or location.usage != 'internal':
+                continue
+            warehouse = location.warehouse_id
+            if not warehouse:
+                continue
+            by_warehouse.setdefault(warehouse, record.env['product.product'])
+            by_warehouse[warehouse] |= product
+    for warehouse, products in by_warehouse.items():
+        products._trigger_cartona_sync('stock', warehouse=warehouse)
+
+
 class StockMove(models.Model):
     _inherit = 'stock.move'
 
     def _action_done(self, cancel_backorder=False):
         result = super()._action_done(cancel_backorder)
         if not self.env.context.get('skip_cartona_sync'):
-            products = self.mapped('product_id')
-            if products:
-                products._trigger_cartona_sync('stock')
+            _trigger_stock_sync_by_warehouse(
+                self, ('location_id', 'location_dest_id'),
+            )
         return result
 
 
@@ -22,9 +48,7 @@ class StockQuant(models.Model):
     def write(self, vals):
         result = super().write(vals)
         if 'quantity' in vals and not self.env.context.get('skip_cartona_sync'):
-            products = self.mapped('product_id')
-            if products:
-                products._trigger_cartona_sync('stock')
+            _trigger_stock_sync_by_warehouse(self, ('location_id',))
         return result
 
 

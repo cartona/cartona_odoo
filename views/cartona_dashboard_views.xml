@@ -143,32 +143,4 @@
         <field name="default_view_mode">list</field>
     </record>
 
-    <record id="action_cartona_recent_activity" model="ir.actions.server">
-        <field name="name">Recent Activity</field>
-        <field name="model_id" ref="model_cartona_config"/>
-        <field name="state">code</field>
-        <field name="code">action = model.action_recent_activity_for_company()</field>
-    </record>
-
-    <record id="action_cartona_log_details" model="ir.actions.server">
-        <field name="name">Log Details</field>
-        <field name="model_id" ref="model_cartona_config"/>
-        <field name="state">code</field>
-        <field name="code">action = model.action_log_details_for_company()</field>
-    </record>
-
-    <record id="action_cartona_dashboard" model="ir.actions.server">
-        <field name="name">Cartona Overview</field>
-        <field name="model_id" ref="model_cartona_config"/>
-        <field name="state">code</field>
-        <field name="code">action = model.action_dashboard_for_company()</field>
-    </record>
-
-    <record id="action_cartona_open" model="ir.actions.server">
-        <field name="name">Cartona</field>
-        <field name="model_id" ref="model_cartona_config"/>
-        <field name="state">code</field>
-        <field name="code">action = model.action_open_dashboard()</field>
-    </record>
-
 </odoo>

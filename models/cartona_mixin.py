@@ -4,6 +4,5 @@ CARTONA_AUTH_HEADER = 'AuthorizationToken'
 
 
 def cartona_sync_enabled(env, company=None):
-    """Return True when Cartona sync is active for the given company."""
-    config = env['cartona.config'].get_for_company(company)
-    return bool(config and config.is_cartona_sync_enabled)
+    """Return True when Cartona sync is active for any config in the company."""
+    return bool(env['cartona.config'].enabled_configs_for_company(company))

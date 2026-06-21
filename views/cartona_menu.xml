@@ -3,32 +3,14 @@
 
     <menuitem id="menu_cartona_root"
               name="Cartona"
-              action="action_cartona_open"
+              action="action_cartona_config_list"
               web_icon="cartona_odoo,static/description/icon.png"
               sequence="50"/>
 
-    <menuitem id="menu_cartona_dashboard"
-              name="Overview"
-              parent="menu_cartona_root"
-              action="action_cartona_dashboard"
-              sequence="5"/>
-
-    <menuitem id="menu_cartona_recent_activity"
-              name="Recent Activity"
-              parent="menu_cartona_root"
-              action="action_cartona_recent_activity"
-              sequence="6"/>
-
-    <menuitem id="menu_cartona_log_details"
-              name="Log Details"
-              parent="menu_cartona_root"
-              action="action_cartona_log_details"
-              sequence="7"/>
-
     <menuitem id="menu_cartona_config"
-              name="Configuration"
+              name="Configurations"
               parent="menu_cartona_root"
-              action="action_cartona_config"
+              action="action_cartona_config_list"
               sequence="10"/>
 
 </odoo>

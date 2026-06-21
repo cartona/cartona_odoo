@@ -1,6 +1,6 @@
 {
     'name': 'Cartona Integration',
-    'version': '18.0.2.0.46',
+    'version': '18.0.2.0.47',
     'category': 'Sales',
     'summary': 'Cartona supplier integration for Odoo 18',
     'description': """
@@ -12,7 +12,7 @@ Connect Odoo to Cartona supplier-integrations API:
 - Variant-only product sync via internal_product_id (Odoo variant id)
 - Inbound order pull and outbound status/line sync
 - Global sync gate on cartona.config.is_cartona_sync_enabled
-- One cartona.config per Odoo company (multi-company)
+- One cartona.config per Odoo warehouse (company-aware, warehouse-scoped stock)
 - Queue-based async processing via OCA queue_job
     """,
     'author': 'Cartona Integration Team',

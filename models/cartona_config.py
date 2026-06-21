@@ -39,18 +39,26 @@ class CartonaConfig(models.Model):
     _order = 'sequence, name'
     _sql_constraints = [
         (
-            'company_uniq',
-            'unique(company_id)',
-            'Only one Cartona configuration is allowed per company.',
+            'warehouse_uniq',
+            'unique(warehouse_id)',
+            'Only one Cartona configuration is allowed per warehouse.',
         ),
     ]
 
     name = fields.Char(default='Cartona', required=True)
     sequence = fields.Integer(default=10)
+    warehouse_id = fields.Many2one(
+        'stock.warehouse',
+        required=True,
+        ondelete='restrict',
+        help='Warehouse whose stock is synced to Cartona under this supplier token.',
+    )
     company_id = fields.Many2one(
         'res.company',
-        required=True,
-        default=lambda self: self.env.company,
+        related='warehouse_id.company_id',
+        store=True,
+        readonly=True,
+        index=True,
     )
 
     api_base_url = fields.Char(
@@ -152,71 +160,33 @@ class CartonaConfig(models.Model):
                 ('cartona_config_id', '=', config.id),
             ]):
                 raise UserError(_(
-                    'Cannot delete Cartona configuration for %s: '
+                    'Cannot delete Cartona configuration for warehouse %s: '
                     'Cartona orders are still linked to it.',
-                ) % config.company_id.display_name)
+                ) % config.warehouse_id.display_name)
         return super().unlink()
 
     @api.model
-    def get_for_company(self, company=None):
-        company = company or self.env.company
-        return self.search([('company_id', '=', company.id)], limit=1)
+    def get_for_warehouse(self, warehouse):
+        if not warehouse:
+            return self.browse()
+        return self.search([('warehouse_id', '=', warehouse.id)], limit=1)
 
     @api.model
-    def require_for_company(self, company=None):
-        company = company or self.env.company
-        config = self.get_for_company(company)
+    def require_for_warehouse(self, warehouse):
+        config = self.get_for_warehouse(warehouse)
         if not config:
             raise UserError(_(
-                'No Cartona configuration for company %s.',
-            ) % company.display_name)
+                'No Cartona configuration for warehouse %s.',
+            ) % (warehouse.display_name if warehouse else '-'))
         return config
 
-    def _config_form_view_id(self):
-        return self.env.ref('cartona_odoo.view_cartona_config_form').id
-
     @api.model
-    def action_open_for_company(self):
-        company = self.env.company
-        config = self.get_for_company(company)
-        action = {
-            'type': 'ir.actions.act_window',
-            'name': _('Cartona Configuration'),
-            'res_model': 'cartona.config',
-            'view_mode': 'form',
-            'views': [(self._config_form_view_id(), 'form')],
-            'target': 'current',
-        }
-        if config:
-            action['res_id'] = config.id
-        else:
-            action['context'] = {
-                'default_company_id': company.id,
-                'default_name': company.name,
-            }
-        return action
-
-    @api.model
-    def action_dashboard_for_company(self):
-        config = self.get_for_company()
-        if not config:
-            return self.action_open_for_company()
-        config._update_sync_stats()
-        return config.action_dashboard_overview()
-
-    @api.model
-    def action_recent_activity_for_company(self):
-        config = self.get_for_company()
-        if not config:
-            return self.action_open_for_company()
-        return config.action_dashboard_recent_activity()
-
-    @api.model
-    def action_log_details_for_company(self):
-        config = self.get_for_company()
-        if not config:
-            return self.action_open_for_company()
-        return config.action_dashboard_log_details()
+    def enabled_configs_for_company(self, company=None):
+        company = company or self.env.company
+        return self.search([
+            ('company_id', '=', company.id),
+            ('is_cartona_sync_enabled', '=', True),
+        ])
 
     def _cartona_pending_jobs_domain(self):
         return [
@@ -514,9 +484,10 @@ class CartonaConfig(models.Model):
         self._refresh_dashboard_issues_if_stale(force=True)
         return {'type': 'ir.actions.client', 'tag': 'reload'}
 
-    @api.model
     def action_open_dashboard(self):
-        return self.action_dashboard_for_company()
+        self.ensure_one()
+        self._update_sync_stats()
+        return self.action_dashboard_overview()
 
     def action_view_products_synced(self):
         return self._action_view_sync_by_status('synced')
@@ -585,9 +556,6 @@ class CartonaConfig(models.Model):
             'view_mode': 'list,form',
             'domain': [('id', 'in', jobs.ids)],
         }
-
-    def action_open_singleton(self):
-        return self.action_open_for_company()
 
     def test_connection(self):
         self.ensure_one()
@@ -694,8 +662,8 @@ class CartonaConfig(models.Model):
         self.with_delay(
             channel='cartona',
             description=_(
-                'Sync all saleable variants to Cartona (%s)',
-            ) % company.display_name,
+                'Sync all saleable variants to Cartona [%s]',
+            ) % self.warehouse_id.name,
         ).sync_all_variants_job()
         return {
             'type': 'ir.actions.client',
@@ -704,8 +672,8 @@ class CartonaConfig(models.Model):
                 'title': _('Variant Sync Queued'),
                 'message': _(
                     '%(count)s variant(s) queued for price and stock sync '
-                    'for %(company)s. Track progress in Recent Activity.',
-                ) % {'count': variant_count, 'company': company.display_name},
+                    'for warehouse %(warehouse)s. Track progress in Recent Activity.',
+                ) % {'count': variant_count, 'warehouse': self.warehouse_id.display_name},
                 'type': 'info',
             },
         }
@@ -717,6 +685,7 @@ class CartonaConfig(models.Model):
             return
         self.env['cartona.api'].with_company(self.company_id).with_context(
             cartona_config_id=self.id,
+            cartona_warehouse_id=self.warehouse_id.id,
             cartona_log_action_type='manual',
         ).sync_all_variants()
 

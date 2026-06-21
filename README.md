@@ -6,8 +6,10 @@ Odoo module for Cartona supplier-integrations API. Products link via **`internal
 
 - **Product sync:** variant-only (`product.product`); outbound price/stock via `POST supplier-product/bulk-update`
 - **Order sync:** inbound pull + outbound status/line updates
-- **Multi-company:** one `cartona.config` per Odoo company, each with its own API token
-- **Sync gate:** `cartona.config.is_cartona_sync_enabled` per company (default off)
+- **Per-warehouse, company-aware:** one `cartona.config` **per warehouse** (`warehouse_id` unique), each with its own API token / Cartona supplier. `company_id` is derived from the warehouse and still drives multi-company record rules and product eligibility.
+- **Stock is warehouse-scoped:** the quantity pushed is the variant's **Free to Use in that warehouse** (`free_qty` with `warehouse` context), not company-wide.
+- **Trigger routing:** a stock change syncs only the **affected warehouse's** config; a price/product change fans out to **all enabled configs in the company** (same `lst_price` to every supplier).
+- **Sync gate:** `cartona.config.is_cartona_sync_enabled` per config (default off)
 - **Async jobs:** OCA `queue_job` on channel `cartona` (bundled in `addons/`)
 
 ## Prerequisites
@@ -40,21 +42,30 @@ docker compose restart web
 
 ## Configure Cartona
 
-1. Switch to the target company (multi-company installs)
-2. **Cartona → Configuration** (creates a config for the active company if none exists)
-3. Set API URL and auth token (Cartona Manager only)
-4. **Test Connection**
-5. Enable **Enable Cartona Sync** when ready for live sync
+1. **Cartona** menu → opens the configs list (one row per warehouse, scoped to the active company)
+2. **Create** a config: pick the **Warehouse** (company auto-fills), set API URL and auth token (Cartona Manager only)
+3. **Test Connection**
+4. Enable **Enable Cartona Sync** when ready for live sync
+5. Use **Open Dashboard**, **Recent Activity**, **Log Details** per config (row buttons or form buttons)
 
-Repeat for each Odoo company that connects to a separate Cartona supplier account.
+Repeat per warehouse that connects to a separate Cartona supplier account. Each warehouse must have its own token.
 
-## Multi-company notes
+## Per-warehouse / multi-company notes
 
-- Overview, Recent Activity, and Log Details always reflect the **active company**
-- Product sync uses the config for the variant's company (or active company for shared products)
-- Per-config sync state lives on `cartona.product.sync` (one row per variant + config); shared variants get independent rows per company
-- The variant **Cartona** tab lists sync rows per configuration (rows appear after the first sync attempt for that config)
-- Record rules restrict configs, logs, and product sync rows to allowed companies
+- One `cartona.config` per **warehouse** (`unique(warehouse_id)`); `company_id` is a stored related field from the warehouse.
+- A company can have **N warehouses → N configs**, each pushing its own warehouse's stock to its own supplier.
+- Stock pushed = `free_qty` evaluated **with the config's warehouse context**.
+- Per-config sync state lives on `cartona.product.sync` (one row per variant + config); the same variant gets independent rows per warehouse config.
+- The variant **Cartona** tab lists sync rows per configuration (rows appear after the first sync attempt for that config).
+- Record rules restrict configs, logs, and product sync rows to allowed companies (via the derived `company_id`).
+
+## Breaking changes (per-warehouse migration, 18.0.2.0.47)
+
+- `cartona.config` now requires `warehouse_id` and is unique per warehouse (the old `unique(company_id)` is dropped).
+- Resolver API: `get_for_company()` / `require_for_company()` are replaced by `get_for_warehouse()` / `require_for_warehouse()` (stock) and `enabled_configs_for_company()` (price/product fan-out).
+- Stock numbers sent to Cartona change from company-wide to warehouse-scoped. For a company whose stock is concentrated in one warehouse, the value is unchanged once that config is mapped to the stock-holding warehouse.
+- The top-level **Overview / Recent Activity / Log Details** menus are gone; these are now per-config actions reached from the configs list or the config form.
+- `post_init_hook` no longer auto-creates a placeholder config (a config now needs a warehouse). Managers create configs from the list.
 
 ## Linking products
 
@@ -95,21 +106,33 @@ Version **18.0.2.0.33** cleans stale product views referencing removed `cartona_
 
 Version **18.0.2.0.39** removes marketplace-era cron, groups, ACL duplicates, orphan wizard table, and legacy `product_product.cartona_sync_*` columns.
 
+Version **18.0.2.0.47** moves config scoping from per-company to **per-warehouse**. The pre-migrate adds `cartona_config.warehouse_id`, backfills each config to the warehouse holding its stock (most `stock_quant` rows; falls back to the company's first warehouse; leaves NULL only for a warehouse-less company), and drops `company_uniq`. `NOT NULL` + `warehouse_uniq` are then applied by the ORM (Odoo logs and continues for any residual NULL). Idempotent and a no-op on a DB with no configs.
+
+### Prod rollout checklist (18.0.2.0.47)
+
+1. **Test locally first** (fresh install, two-step migration upgrade, multi-warehouse routing).
+2. Pre-deploy: confirm the existing prod config should map to its **stock-holding warehouse** (e.g. `SB2B`), and document the warehouse ↔ supplier token mapping for any extra warehouses.
+3. Deploy + upgrade; verify `cartona_config.warehouse_id` is set to the stock-holding warehouse before re-enabling sync.
+4. Create additional configs + tokens for other warehouses from the configs list.
+5. Run **Sync All Variants** per warehouse config.
+6. Verify Cartona stock per supplier matches Odoo warehouse `free_qty`.
+7. Monitor order pull per config (no duplicate orders when tokens are supplier-distinct).
+
 ## Architecture
 
 | Direction | Trigger | API |
 |---|---|---|
 | Cartona → Odoo orders | Cron + manual pull | `GET order/pull-orders` |
-| Odoo → Cartona price | Variant `lst_price` write | `POST supplier-product/bulk-update` |
-| Odoo → Cartona stock | Stock move/quant | `POST supplier-product/bulk-update` |
+| Odoo → Cartona price | Variant `lst_price` write (fan-out to all company configs) | `POST supplier-product/bulk-update` |
+| Odoo → Cartona stock | Stock move/quant (only the affected warehouse's config) | `POST supplier-product/bulk-update` |
 | Odoo → Cartona status | SO state change / delivery validate | `POST order/update-order-status/:id` |
 | Odoo → Cartona lines | SO line create/write/unlink | `POST order/update-order-details` |
 
-**Emergency stop:** set `is_cartona_sync_enabled = False` on the company's config.
+**Emergency stop:** set `is_cartona_sync_enabled = False` on the warehouse config (or all of them).
 
 ## Troubleshooting
 
-- **Overview / logs:** Cartona → Overview / Recent Activity / Log Details
+- **Overview / logs:** Cartona → open a config → Open Dashboard / Recent Activity / Log Details
 - **queue_job:** Settings → Technical → Queue Jobs (requires debug mode)
 - **Connection errors:** verify token and `api_base_url` trailing slash
 - **Order pull rejects lines:** ensure `internal_product_id` is set on Cartona and variant exists in Odoo for that company
