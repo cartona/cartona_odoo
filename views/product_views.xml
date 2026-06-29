@@ -10,6 +10,7 @@
                 <page string="Cartona" name="cartona">
                     <group>
                         <field name="id" string="Internal Product ID" readonly="1"/>
+                        <field name="cartona_is_unlimited_stock"/>
                     </group>
                     <field name="cartona_sync_ids" readonly="1">
                         <list>

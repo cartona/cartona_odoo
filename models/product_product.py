@@ -15,6 +15,14 @@ class ProductProduct(models.Model):
         'product_id',
         string='Cartona Sync Status',
     )
+    cartona_is_unlimited_stock = fields.Boolean(
+        string='Unlimited Stock',
+        default=False,
+        help=(
+            'When enabled, Cartona receives is_unlimited_stock=true instead of the '
+            'actual warehouse stock quantity.'
+        ),
+    )
 
     def _cartona_internal_product_id(self):
         self.ensure_one()
@@ -39,8 +47,12 @@ class ProductProduct(models.Model):
 
     def write(self, vals):
         result = super().write(vals)
-        if 'lst_price' in vals and not self.env.context.get('skip_cartona_sync'):
-            self._trigger_cartona_sync('price')
+        if not self.env.context.get('skip_cartona_sync'):
+            if 'lst_price' in vals:
+                self._trigger_cartona_sync('price')
+            if 'cartona_is_unlimited_stock' in vals:
+                # Fan out to all company configs — this flag is variant-level, not warehouse-specific
+                self._trigger_cartona_sync('stock')
         return result
 
     def _queue_cartona_sync(self, record, config, sync_fields):

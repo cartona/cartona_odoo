@@ -128,8 +128,12 @@ class CartonaAPI(models.Model):
         if sync_fields in ('price', 'both'):
             payload['selling_price'] = str(variant.lst_price)
         if sync_fields in ('stock', 'both'):
-            stock_variant = variant.with_context(warehouse_id=warehouse.id) if warehouse else variant
-            payload['available_stock_quantity'] = int(stock_variant.free_qty)
+            if variant.cartona_is_unlimited_stock:
+                payload['is_unlimited_stock'] = True
+            else:
+                payload['is_unlimited_stock'] = False
+                stock_variant = variant.with_context(warehouse_id=warehouse.id) if warehouse else variant
+                payload['available_stock_quantity'] = int(stock_variant.free_qty)
         return payload
 
     def bulk_update_products(self, variants, sync_fields='both'):
