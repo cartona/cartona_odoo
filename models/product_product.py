@@ -56,16 +56,18 @@ class ProductProduct(models.Model):
         return result
 
     def _queue_cartona_sync(self, record, config, sync_fields):
-        record.with_context(
-            cartona_config_id=config.id,
-            cartona_warehouse_id=config.warehouse_id.id,
-        ).with_delay(
+        # config_id is passed as an explicit job argument rather than via with_context()
+        # because queue_job only preserves an allow-listed subset of context keys
+        # (tz, lang, allowed_company_ids, force_company, active_test) when it serializes
+        # a job for storage - cartona_config_id would otherwise be silently dropped and
+        # _sync_to_cartona would fall back to the wrong config once the job actually runs.
+        record.with_delay(
             channel='cartona',
             description=(
                 f'Sync variant {record.display_name} to Cartona '
                 f'[{config.warehouse_id.name}] ({sync_fields})'
             ),
-        )._sync_to_cartona(sync_fields)
+        )._sync_to_cartona(sync_fields, config_id=config.id)
 
     def _trigger_cartona_sync(self, sync_fields, warehouse=None):
         """Route sync jobs by intent.
@@ -113,9 +115,12 @@ class ProductProduct(models.Model):
             'response_data': result.get('response_data'),
         }
 
-    def _sync_to_cartona(self, sync_fields='both'):
+    def _sync_to_cartona(self, sync_fields='both', config_id=None):
         self.ensure_one()
-        config_id = self.env.context.get('cartona_config_id')
+        # Prefer the explicit argument (see _queue_cartona_sync); fall back to context
+        # only for direct synchronous calls (e.g. action_manual_cartona_sync) and any
+        # already-queued legacy jobs still in the backlog when this deploys.
+        config_id = config_id or self.env.context.get('cartona_config_id')
         if config_id:
             config = self.env['cartona.config'].browse(config_id)
         else:
@@ -179,10 +184,8 @@ class ProductProduct(models.Model):
         synced = 0
         for config in configs:
             self.with_context(
-                cartona_config_id=config.id,
-                cartona_warehouse_id=config.warehouse_id.id,
                 cartona_log_action_type='manual',
-            )._sync_to_cartona('both')
+            )._sync_to_cartona('both', config_id=config.id)
             if self._cartona_sync_record(config).sync_status == 'synced':
                 synced += 1
         return {

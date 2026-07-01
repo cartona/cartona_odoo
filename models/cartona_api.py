@@ -443,88 +443,87 @@ class CartonaAPI(models.Model):
                 ('id', 'not in', synced_product_ids),
             ], limit=remaining)
             if extra_products:
-                for product in extra_products:
-                    sync_model.get_for_product_config(product, config)
+                sync_model.ensure_for_products(extra_products, config)
                 variants |= extra_products
         return variants, sync_model
 
-    def _sync_variants_in_batches(
-        self,
-        config,
-        variants,
-        *,
-        success_message,
-        failure_message,
-        summary_message,
-    ):
+    def _sync_one_batch(self, config, batch):
+        """Sync a single batch (<= config.batch_size variants) in one HTTP call.
+
+        Returns (success_count, error_count, detail_lines, result) for the
+        caller to aggregate/log. Kept small and self-contained so it can be
+        run either inline (small synchronous callers) or as the body of its
+        own queue_job job (large fan-out, see sync_variant_batch_job) without
+        ever holding a DB lock for longer than one batch's HTTP call.
+        """
+        sync_model = self.env['cartona.product.sync']
+        company = config.company_id
+        warehouse = config.warehouse_id
+        batch = batch.with_company(company)
+        batch_sync_recs = sync_model.search([
+            ('cartona_config_id', '=', config.id),
+            ('product_id', 'in', batch.ids),
+        ])
+        batch_sync_recs.mark_syncing()
+        result = self.bulk_update_products(batch, sync_fields='both')
+        batch_payloads = [
+            self._build_variant_payload(variant, 'both', company=company, warehouse=warehouse)
+            for variant in batch
+        ]
+        detail_lines = []
+        if result.get('success'):
+            success_count, error_count = len(batch), 0
+            batch_sync_recs.mark_success()
+            status, message_tpl = 'success', _('Synced variant %s')
+        else:
+            success_count, error_count = 0, len(batch)
+            batch_sync_recs.mark_error(result.get('error', 'Unknown error'))
+            status, message_tpl = 'error', _('Failed to sync variant %s')
+        for variant, payload in zip(batch, batch_payloads):
+            detail_lines.append({
+                'status': status,
+                'entry_type': 'product',
+                'internal_product_id': str(variant.id),
+                'record_model': 'product.product',
+                'record_id': variant.id,
+                'record_name': variant.display_name,
+                'message': message_tpl % variant.display_name,
+                'request_data': json.dumps({
+                    'endpoint': 'supplier-product/bulk-update',
+                    'method': 'POST',
+                    'sync_fields': 'both',
+                    'payload': payload,
+                }, indent=2, ensure_ascii=False, default=str),
+                'response_data': result.get('response_data'),
+            })
+        return success_count, error_count, detail_lines, result
+
+    def _sync_variants_in_batches(self, config, variants, *, summary_message):
+        """Synchronous multi-batch sync, for small/bounded variant sets only
+        (e.g. retry_failed_variants, capped at limit=100). Large catalogs use
+        sync_all_variants_fanout instead, to avoid holding one job/DB
+        connection open for the whole run (see JobFoundDead investigation).
+        """
         import time
 
         sync_model = self.env['cartona.product.sync']
         if not variants:
             return
-        for product in variants:
-            sync_model.get_for_product_config(product, config)
+        sync_model.ensure_for_products(variants, config)
         success_count = error_count = 0
         last_error = None
         detail_lines = []
         batch_start = time.time()
         result = {}
-        company = config.company_id
-        warehouse = config.warehouse_id
-        variants = variants.with_company(company)
+        variants = variants.with_company(config.company_id)
         for i in range(0, len(variants), config.batch_size):
             batch = variants[i:i + config.batch_size]
-            batch_sync_recs = sync_model.search([
-                ('cartona_config_id', '=', config.id),
-                ('product_id', 'in', batch.ids),
-            ])
-            batch_sync_recs.mark_syncing()
-            result = self.bulk_update_products(batch, sync_fields='both')
-            batch_payloads = [
-                self._build_variant_payload(variant, 'both', company=company, warehouse=warehouse)
-                for variant in batch
-            ]
-            if result.get('success'):
-                success_count += len(batch)
-                batch_sync_recs.mark_success()
-                for variant, payload in zip(batch, batch_payloads):
-                    detail_lines.append({
-                        'status': 'success',
-                        'entry_type': 'product',
-                        'internal_product_id': str(variant.id),
-                        'record_model': 'product.product',
-                        'record_id': variant.id,
-                        'record_name': variant.display_name,
-                        'message': success_message(variant),
-                        'request_data': json.dumps({
-                            'endpoint': 'supplier-product/bulk-update',
-                            'method': 'POST',
-                            'sync_fields': 'both',
-                            'payload': payload,
-                        }, indent=2, ensure_ascii=False, default=str),
-                        'response_data': result.get('response_data'),
-                    })
-            else:
-                error_count += len(batch)
+            batch_success, batch_error, batch_detail_lines, result = self._sync_one_batch(config, batch)
+            success_count += batch_success
+            error_count += batch_error
+            if batch_error:
                 last_error = result.get('error', 'Unknown error')
-                batch_sync_recs.mark_error(last_error)
-                for variant, payload in zip(batch, batch_payloads):
-                    detail_lines.append({
-                        'status': 'error',
-                        'entry_type': 'product',
-                        'internal_product_id': str(variant.id),
-                        'record_model': 'product.product',
-                        'record_id': variant.id,
-                        'record_name': variant.display_name,
-                        'message': failure_message(variant),
-                        'request_data': json.dumps({
-                            'endpoint': 'supplier-product/bulk-update',
-                            'method': 'POST',
-                            'sync_fields': 'both',
-                            'payload': payload,
-                        }, indent=2, ensure_ascii=False, default=str),
-                        'response_data': result.get('response_data'),
-                    })
+            detail_lines.extend(batch_detail_lines)
         self.env['cartona.sync.log'].log_operation(
             cartona_config_id=config.id,
             operation_type='product_sync',
@@ -557,14 +556,68 @@ class CartonaAPI(models.Model):
         self._sync_variants_in_batches(
             config,
             variants,
-            success_message=lambda variant: _(
-                'Synced variant %s (retry batch)',
-            ) % variant.display_name,
-            failure_message=lambda variant: _(
-                'Failed to sync variant %s (retry batch)',
-            ) % variant.display_name,
             summary_message='Retry sync finished: {success} succeeded, {error} failed ({total} total)',
         )
+
+    def sync_all_variants_fanout(self, config, variants):
+        """Fan large catalogs out into one small, independently-retryable
+        queue_job per batch, instead of one job looping through every batch
+        (which for large warehouses held a single DB connection/lock open
+        for minutes and was getting killed mid-run - JobFoundDead).
+        """
+        sync_model = self.env['cartona.product.sync']
+        sync_model.ensure_for_products(variants, config)
+        batches = [
+            variants[i:i + config.batch_size]
+            for i in range(0, len(variants), config.batch_size)
+        ]
+        total = len(batches)
+        for idx, batch in enumerate(batches, start=1):
+            self.with_delay(
+                channel='cartona',
+                description=_('Sync variant batch %(idx)s/%(total)s to Cartona [%(wh)s]') % {
+                    'idx': idx, 'total': total, 'wh': config.warehouse_id.name,
+                },
+            ).sync_variant_batch_job(config.id, batch.ids, idx, total)
+
+    def sync_variant_batch_job(self, config_id, variant_ids, batch_index, batch_total):
+        """Queue job entrypoint for one batch of sync_all_variants_fanout.
+
+        config_id is an explicit argument (not context) for the same reason
+        as _sync_to_cartona's config_id: queue_job only preserves an
+        allow-listed subset of context keys across with_delay(), so
+        cartona_config_id would otherwise be silently dropped.
+        """
+        config = self.env['cartona.config'].browse(config_id)
+        if not config.exists() or not config.is_cartona_sync_enabled:
+            return
+        # This job just crossed its own with_delay() boundary, so self's context is
+        # back down to the allow-listed keys only - re-establish it synchronously
+        # here (as sync_all_variants_job does) before touching cartona.api internals
+        # like _get_cartona_config()/_resolve_sync_warehouse() that read from context.
+        self = self.with_company(config.company_id).with_context(
+            cartona_config_id=config.id,
+            cartona_warehouse_id=config.warehouse_id.id,
+        )
+        variants = self.env['product.product'].with_company(config.company_id).browse(variant_ids)
+        success_count, error_count, detail_lines, result = self._sync_one_batch(config, variants)
+        self.env['cartona.sync.log'].log_operation(
+            cartona_config_id=config.id,
+            operation_type='product_sync',
+            status='success' if not error_count else ('warning' if success_count else 'error'),
+            message=_('Batch %(idx)s/%(total)s finished: %(success)s succeeded, %(error)s failed') % {
+                'idx': batch_index, 'total': batch_total, 'success': success_count, 'error': error_count,
+            },
+            records_processed=len(variants),
+            records_success=success_count,
+            records_error=error_count,
+            request_data=result.get('request_data'),
+            response_data=result.get('response_data'),
+            line_vals_list=detail_lines,
+            action_type='manual',
+        )
+        config._update_sync_stats()
+        config._refresh_dashboard_issues_if_stale(force=True)
 
     def sync_all_variants(self):
         config = self._get_cartona_config()
@@ -577,17 +630,4 @@ class CartonaAPI(models.Model):
         ])
         if not variants:
             return
-        self._sync_variants_in_batches(
-            config,
-            variants,
-            success_message=lambda variant: _(
-                'Synced variant %s (bulk manual)',
-            ) % variant.display_name,
-            failure_message=lambda variant: _(
-                'Failed to sync variant %s (bulk manual)',
-            ) % variant.display_name,
-            summary_message=(
-                'Bulk variant sync finished: {success} succeeded, '
-                '{error} failed ({total} total)'
-            ),
-        )
+        self.sync_all_variants_fanout(config, variants)

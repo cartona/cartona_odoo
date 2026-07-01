@@ -52,19 +52,74 @@ class CartonaProductSync(models.Model):
 
     @api.model
     def get_for_product_config(self, product, config, create=True):
+        """Race-safe get-or-create.
+
+        Two jobs can legitimately try to create the sync row for the same
+        (product, config) pair at the same time (e.g. a price change and a
+        stock change on the same variant). A plain search-then-create would
+        let both pass the search and then have the second create() raise
+        UniqueViolation, failing the whole job. Using a raw upsert instead
+        lets Postgres resolve the collision with no exception at all.
+
+        NOTE: bypasses the ORM create() (no create()-hook side effects) -
+        fine today since this model has no create() override or tracking.
+        """
         if not product or not config:
             return self.browse()
         sync_rec = self.sudo().search([
             ('product_id', '=', product.id),
             ('cartona_config_id', '=', config.id),
         ], limit=1)
-        if not sync_rec and create:
-            sync_rec = self.sudo().create({
-                'product_id': product.id,
-                'cartona_config_id': config.id,
-                'sync_status': 'not_synced',
+        if sync_rec or not create:
+            return sync_rec
+        self.env.cr.execute("""
+            INSERT INTO cartona_product_sync
+                (product_id, cartona_config_id, company_id, sync_status, create_date, write_date, create_uid, write_uid)
+            VALUES (%s, %s, %s, 'not_synced', now(), now(), %s, %s)
+            ON CONFLICT (product_id, cartona_config_id) DO NOTHING
+            RETURNING id
+        """, (product.id, config.id, config.company_id.id, self.env.uid, self.env.uid))
+        row = self.env.cr.fetchone()
+        if row:
+            return self.browse(row[0])
+        # Lost the race - the other job's row is already there.
+        return self.sudo().search([
+            ('product_id', '=', product.id),
+            ('cartona_config_id', '=', config.id),
+        ], limit=1)
+
+    @api.model
+    def ensure_for_products(self, products, config):
+        """Bulk get-or-create for many products against one config.
+
+        Replaces per-product get_for_product_config loops with a single
+        query pass plus one bulk upsert for whatever is missing - both
+        faster for large catalogs and race-safe under concurrent callers.
+        """
+        if not products or not config:
+            return self.browse()
+        existing = self.sudo().search([
+            ('product_id', 'in', products.ids),
+            ('cartona_config_id', '=', config.id),
+        ])
+        missing_ids = set(products.ids) - set(existing.product_id.ids)
+        if missing_ids:
+            self.env.cr.execute("""
+                INSERT INTO cartona_product_sync
+                    (product_id, cartona_config_id, company_id, sync_status, create_date, write_date, create_uid, write_uid)
+                SELECT p, %(config_id)s, %(company_id)s, 'not_synced', now(), now(), %(uid)s, %(uid)s
+                FROM unnest(%(product_ids)s) AS p
+                ON CONFLICT (product_id, cartona_config_id) DO NOTHING
+            """, {
+                'config_id': config.id,
+                'company_id': config.company_id.id,
+                'uid': self.env.uid,
+                'product_ids': list(missing_ids),
             })
-        return sync_rec
+        return self.sudo().search([
+            ('product_id', 'in', products.ids),
+            ('cartona_config_id', '=', config.id),
+        ])
 
     def mark_syncing(self):
         self.sudo().write({'sync_status': 'syncing', 'sync_error': False})

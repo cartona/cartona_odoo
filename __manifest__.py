@@ -1,6 +1,6 @@
 {
     'name': 'Cartona Integration',
-    'version': '18.0.2.0.48',
+    'version': '18.0.2.0.49',
     'category': 'Sales',
     'summary': 'Cartona supplier integration for Odoo 18',
     'description': """
