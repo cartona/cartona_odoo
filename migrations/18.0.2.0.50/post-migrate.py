@@ -37,15 +37,19 @@ def migrate(cr, version):
 
     # cartona.sync.log.line had grown to ~9.4M rows with only (id) and
     # (sync_log_id) indexed. The dashboard "product mapping issue" query
-    # filters on entry_type/status/error_code before joining to sync_log_id,
-    # forcing a near-full-table scan (~120s measured in production) on every
-    # call to _compute_dashboard_issue_snapshots.
+    # filters on entry_type/status/error_code (matches >1M rows on its own -
+    # not selective) then semi-joins against a small (~300 row) set of
+    # recent sync_log ids for one config. sync_log_id MUST lead the index so
+    # Postgres drives from that small side with a nested loop instead of
+    # bitmap-scanning >1M line rows first: verified in production this drops
+    # the query from ~120s to ~0.07s. (entry_type, status, error_code) alone,
+    # without sync_log_id leading, still picked the same ~120s plan.
     if _table_exists(cr, 'cartona_sync_log_line'):
         _add_index(
             cr,
             'cartona_sync_log_line_issue_idx',
             'cartona_sync_log_line',
-            'entry_type, status, error_code',
+            'sync_log_id, entry_type, status, error_code',
         )
     else:
         _logger.info('Cartona 18.0.2.0.50: cartona_sync_log_line missing; skipping')
