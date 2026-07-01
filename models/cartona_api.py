@@ -544,7 +544,11 @@ class CartonaAPI(models.Model):
             action_type=self.env.context.get('cartona_log_action_type', 'automated'),
         )
         config._update_sync_stats()
-        config._refresh_dashboard_issues_if_stale(force=True)
+        # See sync_variant_batch_job for why this isn't forced here either -
+        # retry_failed_variants runs on a 2-minute cron for every enabled config,
+        # and forcing this ~120s scan (on an unindexed multi-million-row log
+        # table) every cycle would starve the cartona queue_job channel.
+        config._refresh_dashboard_issues_if_stale()
 
     def retry_failed_variants(self, limit=100):
         config = self._get_cartona_config()
@@ -617,7 +621,14 @@ class CartonaAPI(models.Model):
             action_type='manual',
         )
         config._update_sync_stats()
-        config._refresh_dashboard_issues_if_stale(force=True)
+        # Not forced: this scans cartona.sync.log/.line (millions of rows) and was
+        # measured at ~120s per call on unindexed columns. force=True on every
+        # single batch (as a naive port of the old one-job-per-run code would do)
+        # turned one expensive call into dozens per "sync all variants" run,
+        # starving the queue_job channel long enough to trigger false-positive
+        # JobFoundDead failures. Respecting DASHBOARD_ISSUE_CACHE_MINUTES here
+        # means at most one refresh per cache window across an entire run.
+        config._refresh_dashboard_issues_if_stale()
 
     def sync_all_variants(self):
         config = self._get_cartona_config()
